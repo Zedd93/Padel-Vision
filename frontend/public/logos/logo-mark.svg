@@ -1,0 +1,6 @@
+<svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- 2B FILLED LENS — Mark only, no text (for tight spaces, watermarks) -->
+  <rect x="0" y="0" width="36" height="36" rx="10" fill="#C8FF00"/>
+  <path d="M9,5 L18,28 L27,5" fill="#0B0C10" stroke="#0B0C10" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="14" y="36" width="8" height="12" rx="3" fill="#C8FF00"/>
+</svg>

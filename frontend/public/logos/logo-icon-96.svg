@@ -1,0 +1,14 @@
+<svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+  <!-- 2B FILLED LENS — App Icon (96px, PWA, splash) -->
+  <rect width="96" height="96" rx="22" fill="#0B0C10"/>
+  <defs>
+    <linearGradient id="ai2b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C8FF00"/><stop offset="100%" stop-color="#9ED900"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="16" width="48" height="48" rx="14" fill="url(#ai2b)"/>
+  <path d="M36,22 L48,52 L60,22" fill="#0B0C10" stroke="#0B0C10" stroke-width="3" stroke-linejoin="round"/>
+  <line x1="24" y1="36" x2="34" y2="36" stroke="#0B0C10" stroke-width="0.8" opacity="0.15"/>
+  <line x1="62" y1="36" x2="72" y2="36" stroke="#0B0C10" stroke-width="0.8" opacity="0.15"/>
+  <rect x="42" y="64" width="12" height="16" rx="4" fill="url(#ai2b)"/>
+</svg>

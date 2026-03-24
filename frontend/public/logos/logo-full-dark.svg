@@ -1,0 +1,10 @@
+<svg width="200" height="60" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- 2B FILLED LENS — DARK variant (for dark backgrounds) -->
+  <g transform="translate(28, 30)">
+    <rect x="-18" y="-22" width="36" height="36" rx="10" fill="#C8FF00"/>
+    <path d="M-9,-17 L0,6 L9,-17" fill="#0B0C10" stroke="#0B0C10" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="-4" y="14" width="8" height="12" rx="3" fill="#C8FF00"/>
+  </g>
+  <text x="60" y="24" font-family="Bebas Neue, sans-serif" font-size="22" fill="#C8FF00" letter-spacing="3">PADEL</text>
+  <text x="60" y="46" font-family="Bebas Neue, sans-serif" font-size="22" fill="#FFFFFF" letter-spacing="3">VISION</text>
+</svg>

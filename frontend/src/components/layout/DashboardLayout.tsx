@@ -24,7 +24,7 @@ export default function DashboardLayout() {
   if (!isAuthenticated) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
-        <span className="animate-pulse text-display text-3xl text-lime">PADEL VISION</span>
+        <img src="/logos/logo-full-dark.svg" alt="Padel Vision" className="h-10 animate-pulse" />
       </div>
     );
   }
@@ -41,7 +41,7 @@ export default function DashboardLayout() {
             className="flex items-center gap-2 text-muted transition-colors hover:text-text"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="text-display text-lg text-lime">PADEL VISION</span>
+            <img src="/logos/logo-full-dark.svg" alt="Padel Vision" className="h-8" />
           </Link>
           <div className="h-6 w-px bg-border" />
           <span className="text-sm font-medium text-text">Moje konto</span>

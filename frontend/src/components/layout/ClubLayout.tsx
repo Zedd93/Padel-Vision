@@ -42,7 +42,7 @@ export default function ClubLayout() {
             className="flex items-center gap-2 text-muted transition-colors hover:text-text"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="text-display text-lg text-lime">PADEL VISION</span>
+            <img src="/logos/logo-full-dark.svg" alt="Padel Vision" className="h-8" />
           </Link>
           <div className="h-6 w-px bg-border" />
           <span className="text-sm font-medium text-text">Panel Klubu</span>

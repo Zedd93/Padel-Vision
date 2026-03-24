@@ -80,8 +80,12 @@ export default function AuthPage() {
       <div className="w-full max-w-md">
         <div className="glass-card p-8">
           <div className="mb-6 text-center">
-            <Link to="/" className="text-display text-3xl text-lime transition-opacity hover:opacity-80">
-              PADEL VISION
+            <Link to="/" className="inline-flex flex-col items-center gap-2 transition-opacity hover:opacity-80">
+              <img src="/logos/logo-icon-96.svg" alt="Padel Vision" className="h-16 w-16" />
+              <div className="flex items-center gap-1">
+                <span className="font-display text-2xl tracking-[3px] text-lime">PADEL</span>
+                <span className="font-display text-2xl tracking-[3px] text-white">VISION</span>
+              </div>
             </Link>
             <p className="mt-2 text-sm text-muted">
               {isRegister ? 'Utwórz nowe konto' : 'Zaloguj się do swojego konta'}

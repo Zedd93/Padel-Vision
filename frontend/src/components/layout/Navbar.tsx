@@ -559,23 +559,17 @@ function UserMenu() {
 
 function PadelVisionLogo() {
   return (
-    <div className="flex items-center gap-2">
-      {/* Grid icon */}
-      <svg
-        width="28"
-        height="28"
-        viewBox="0 0 28 28"
-        fill="none"
-        className="text-lime"
-      >
-        <rect x="2" y="2" width="10" height="10" rx="2" fill="currentColor" opacity="0.9" />
-        <rect x="16" y="2" width="10" height="10" rx="2" fill="currentColor" opacity="0.6" />
-        <rect x="2" y="16" width="10" height="10" rx="2" fill="currentColor" opacity="0.6" />
-        <rect x="16" y="16" width="10" height="10" rx="2" fill="currentColor" opacity="0.3" />
+    <div className="flex items-center gap-1.5">
+      {/* 2B Filled Lens — racket mark */}
+      <svg width="32" height="42" viewBox="0 0 36 48" className="shrink-0">
+        <rect x="0" y="0" width="36" height="36" rx="10" fill="#C8FF00"/>
+        <path d="M9,5 L18,28 L27,5" fill="#0B0C10" stroke="#0B0C10" strokeWidth="2" strokeLinejoin="round"/>
+        <rect x="14" y="36" width="8" height="12" rx="3" fill="#C8FF00"/>
       </svg>
-      <span className="text-display text-xl tracking-wide text-lime">
-        PADEL VISION
-      </span>
+      <div className="flex flex-col leading-none -space-y-0.5">
+        <span className="font-display text-[15px] tracking-[3px] text-lime">PADEL</span>
+        <span className="font-display text-[15px] tracking-[3px] text-white">VISION</span>
+      </div>
     </div>
   );
 }
