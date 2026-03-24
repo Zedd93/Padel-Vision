@@ -12,11 +12,13 @@ export function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: (data: LoginRequest) => authApi.login(data),
-    onSuccess: ({ data }) => {
-      const { accessToken, refreshToken, user } = data.data;
-      storeLogin(user, accessToken, refreshToken);
-      addToast('Zalogowano pomyślnie', 'success');
-      navigate('/');
+    onSuccess: (response) => {
+      const { accessToken, refreshToken, user } = response?.data?.data ?? (response as any)?.data ?? response;
+      if (accessToken && user) {
+        storeLogin(user, accessToken, refreshToken);
+        addToast('Zalogowano pomyślnie', 'success');
+        navigate('/');
+      }
     },
     onError: () => {
       addToast('Nieprawidłowy email lub hasło', 'error');
@@ -25,11 +27,13 @@ export function useAuth() {
 
   const registerMutation = useMutation({
     mutationFn: (data: RegisterRequest) => authApi.register(data),
-    onSuccess: ({ data }) => {
-      const { accessToken, refreshToken, user } = data.data;
-      storeLogin(user, accessToken, refreshToken);
-      addToast('Konto utworzone!', 'success');
-      navigate('/');
+    onSuccess: (response) => {
+      const { accessToken, refreshToken, user } = response?.data?.data ?? (response as any)?.data ?? response;
+      if (accessToken && user) {
+        storeLogin(user, accessToken, refreshToken);
+        addToast('Konto utworzone!', 'success');
+        navigate('/');
+      }
     },
     onError: () => {
       addToast('Błąd rejestracji. Sprawdź dane.', 'error');
