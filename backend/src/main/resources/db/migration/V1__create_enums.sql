@@ -1,0 +1,12 @@
+-- Padel Vision: Enum types
+
+CREATE TYPE user_role AS ENUM ('VIEWER', 'CLUB', 'ADMIN');
+CREATE TYPE stream_status AS ENUM ('LIVE', 'OFFLINE', 'VOD');
+CREATE TYPE club_plan AS ENUM ('STARTER', 'PRO', 'ENTERPRISE');
+CREATE TYPE viewer_tier AS ENUM ('FREE', 'PASS', 'PRO');
+CREATE TYPE tournament_format AS ENUM ('ELIMINATION', 'ROUND_ROBIN', 'AMERICANO', 'MEXICANO');
+CREATE TYPE tournament_category AS ENUM ('OPEN', 'WOMEN', 'SENIORS', 'MIXED', 'JUNIORS');
+CREATE TYPE tournament_level AS ENUM ('A', 'B1', 'B2', 'C');
+CREATE TYPE transaction_type AS ENUM ('BITS', 'PPV', 'SUBSCRIPTION');
+CREATE TYPE subscription_type AS ENUM ('PLATFORM', 'CLUB');
+CREATE TYPE notification_type AS ENUM ('STREAM_LIVE', 'PLAYER_MATCH', 'TOURNAMENT_STARTING', 'PPV_AVAILABLE', 'BITS_PROMO', 'SYSTEM');

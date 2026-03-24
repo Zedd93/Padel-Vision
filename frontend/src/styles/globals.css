@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+:root {
+  --pv-obsidian: #0B0C10;
+  --pv-surface: #1C1D26;
+  --pv-surface-2: #252632;
+  --pv-lime: #C8FF00;
+  --pv-red: #FF3B3B;
+  --pv-orange: #FF6A00;
+  --pv-white: #F0F0F0;
+  --pv-muted: #7A7B8A;
+  --pv-border: rgba(200, 255, 0, 0.13);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: var(--pv-obsidian);
+  color: var(--pv-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pv-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pv-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pv-lime);
+}

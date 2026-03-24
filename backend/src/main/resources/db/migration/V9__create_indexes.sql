@@ -1,0 +1,22 @@
+-- Additional indexes for performance
+
+CREATE INDEX idx_accounts_user_id ON accounts(user_id);
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_clubs_slug ON clubs(slug);
+CREATE INDEX idx_clubs_stream_key ON clubs(stream_key);
+CREATE INDEX idx_streams_club_id ON streams(club_id);
+CREATE INDEX idx_streams_status ON streams(status);
+CREATE INDEX idx_tournaments_club_id ON tournaments(club_id);
+CREATE INDEX idx_tournaments_date ON tournaments(date);
+CREATE INDEX idx_matches_tournament_id ON matches(tournament_id);
+CREATE INDEX idx_players_club_id ON players(club_id);
+CREATE INDEX idx_players_slug ON players(slug);
+CREATE INDEX idx_follows_follower_id ON follows(follower_id);
+CREATE INDEX idx_follows_club_id ON follows(club_id);
+CREATE INDEX idx_follows_player_id ON follows(player_id);
+CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
+CREATE INDEX idx_subscriptions_club_id ON subscriptions(club_id);
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_vods_stream_id ON vods(stream_id);
+CREATE INDEX idx_highlights_vod_id ON highlights(vod_id);
+CREATE INDEX idx_multistream_configs_club_id ON multistream_configs(club_id);
