@@ -1,0 +1,832 @@
+import { useState, useEffect } from "react";
+import {
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  ArrowUpRight,
+  ArrowDownRight,
+  Users,
+  Coins,
+  Film,
+  Building2,
+  Download,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Send,
+  AlertTriangle,
+  ArrowUpDown,
+  Filter,
+  Wallet,
+  Receipt,
+  BarChart3,
+} from "lucide-react";
+import { cn } from "@/utils/cn";
+import { Link } from "react-router-dom";
+
+/* ─── Data ───────────────────────────────────────────── */
+
+type DateRange = "7d" | "30d" | "90d" | "12m";
+type ChartMetric = "mrr" | "transactions" | "payouts";
+type TxFilter = "all" | "sub" | "ppv" | "bits" | "payout" | "club_plan";
+
+interface PayoutData {
+  id: string;
+  club: string;
+  slug: string;
+  amount: string;
+  amountNum: number;
+  date: string;
+  method: string;
+  status: "pending" | "approved" | "rejected" | "paid";
+}
+
+interface TransactionData {
+  id: string;
+  date: string;
+  type: TxFilter;
+  desc: string;
+  amount: string;
+  amountNum: number;
+  user?: string;
+  detail?: string;
+}
+
+const FINANCE_KPIS: Record<DateRange, { label: string; value: string; change: string; positive: boolean; icon: typeof DollarSign; color: string; href: string }[]> = {
+  "7d": [
+    { label: "MRR", value: "48 320 zł", change: "+12.4%", positive: true, icon: DollarSign, color: "text-lime", href: "#mrr" },
+    { label: "ARR", value: "579 840 zł", change: "+18.2%", positive: true, icon: TrendingUp, color: "text-emerald-400", href: "#mrr" },
+    { label: "Churn Rate", value: "3.2%", change: "-0.8%", positive: true, icon: Users, color: "text-blue-400", href: "/admin/users" },
+    { label: "ARPU", value: "12.56 zł", change: "+1.2%", positive: true, icon: CreditCard, color: "text-orange", href: "#revenue" },
+  ],
+  "30d": [
+    { label: "MRR", value: "48 320 zł", change: "+14.1%", positive: true, icon: DollarSign, color: "text-lime", href: "#mrr" },
+    { label: "ARR", value: "579 840 zł", change: "+19.8%", positive: true, icon: TrendingUp, color: "text-emerald-400", href: "#mrr" },
+    { label: "Churn Rate", value: "3.5%", change: "-1.1%", positive: true, icon: Users, color: "text-blue-400", href: "/admin/users" },
+    { label: "ARPU", value: "11.90 zł", change: "+0.8%", positive: true, icon: CreditCard, color: "text-orange", href: "#revenue" },
+  ],
+  "90d": [
+    { label: "MRR", value: "48 320 zł", change: "+22.6%", positive: true, icon: DollarSign, color: "text-lime", href: "#mrr" },
+    { label: "ARR", value: "579 840 zł", change: "+28.4%", positive: true, icon: TrendingUp, color: "text-emerald-400", href: "#mrr" },
+    { label: "Churn Rate", value: "4.1%", change: "+0.3%", positive: false, icon: Users, color: "text-blue-400", href: "/admin/users" },
+    { label: "ARPU", value: "10.85 zł", change: "+2.4%", positive: true, icon: CreditCard, color: "text-orange", href: "#revenue" },
+  ],
+  "12m": [
+    { label: "MRR", value: "48 320 zł", change: "+156%", positive: true, icon: DollarSign, color: "text-lime", href: "#mrr" },
+    { label: "ARR", value: "579 840 zł", change: "+180%", positive: true, icon: TrendingUp, color: "text-emerald-400", href: "#mrr" },
+    { label: "Churn Rate", value: "3.8%", change: "-2.1%", positive: true, icon: Users, color: "text-blue-400", href: "/admin/users" },
+    { label: "ARPU", value: "8.20 zł", change: "+53%", positive: true, icon: CreditCard, color: "text-orange", href: "#revenue" },
+  ],
+};
+
+const CHART_DATA: Record<ChartMetric, { month: string; amount: number }[]> = {
+  mrr: [
+    { month: "Wrz", amount: 32400 },
+    { month: "Paź", amount: 35200 },
+    { month: "Lis", amount: 38100 },
+    { month: "Gru", amount: 41600 },
+    { month: "Sty", amount: 43800 },
+    { month: "Lut", amount: 45900 },
+    { month: "Mar", amount: 48320 },
+  ],
+  transactions: [
+    { month: "Wrz", amount: 1240 },
+    { month: "Paź", amount: 1380 },
+    { month: "Lis", amount: 1510 },
+    { month: "Gru", amount: 1890 },
+    { month: "Sty", amount: 1720 },
+    { month: "Lut", amount: 1950 },
+    { month: "Mar", amount: 2180 },
+  ],
+  payouts: [
+    { month: "Wrz", amount: 8200 },
+    { month: "Paź", amount: 9100 },
+    { month: "Lis", amount: 10400 },
+    { month: "Gru", amount: 12800 },
+    { month: "Sty", amount: 11900 },
+    { month: "Lut", amount: 13200 },
+    { month: "Mar", amount: 14500 },
+  ],
+};
+
+const CHART_LABELS: Record<ChartMetric, string> = {
+  mrr: "MRR (zł)",
+  transactions: "Transakcje",
+  payouts: "Wypłaty (zł)",
+};
+
+const CHART_COLORS: Record<ChartMetric, string> = {
+  mrr: "bg-lime/60",
+  transactions: "bg-blue-500/60",
+  payouts: "bg-orange/60",
+};
+
+const REVENUE_STREAMS = [
+  { source: "Subskrypcje platformy", icon: CreditCard, amount: "28 450 zł", amountNum: 28450, pct: 59, color: "bg-lime/60", barColor: "bg-lime" },
+  { source: "Subskrypcje kanałów (30%)", icon: Users, amount: "8 920 zł", amountNum: 8920, pct: 18, color: "bg-emerald-500/60", barColor: "bg-emerald-500" },
+  { source: "Piłki/Bits (30%)", icon: Coins, amount: "5 340 zł", amountNum: 5340, pct: 11, color: "bg-yellow-500/60", barColor: "bg-yellow-500" },
+  { source: "PPV (12%)", icon: Film, amount: "3 890 zł", amountNum: 3890, pct: 8, color: "bg-blue-500/60", barColor: "bg-blue-500" },
+  { source: "Plany klubowe (B2B)", icon: Building2, amount: "1 720 zł", amountNum: 1720, pct: 4, color: "bg-purple-500/60", barColor: "bg-purple-500" },
+];
+
+const INITIAL_PAYOUTS: PayoutData[] = [
+  { id: "p1", club: "Racket Club Katowice", slug: "racket-club", amount: "2 847 zł", amountNum: 2847, date: "2025-03-28", method: "Stripe Connect", status: "pending" },
+  { id: "p2", club: "Padel Kraków", slug: "padel-krakow", amount: "1 340 zł", amountNum: 1340, date: "2025-03-28", method: "Stripe Connect", status: "pending" },
+  { id: "p3", club: "Smash Arena Warszawa", slug: "smash-arena", amount: "980 zł", amountNum: 980, date: "2025-03-28", method: "Stripe Connect", status: "pending" },
+  { id: "p4", club: "Court Masters Gdańsk", slug: "court-masters", amount: "560 zł", amountNum: 560, date: "2025-03-28", method: "Stripe Connect", status: "pending" },
+  { id: "p5", club: "Viva Padel Poznań", slug: "viva-padel", amount: "420 zł", amountNum: 420, date: "2025-03-25", method: "Stripe Connect", status: "paid" },
+  { id: "p6", club: "Padel Wrocław", slug: "padel-wroclaw", amount: "310 zł", amountNum: 310, date: "2025-03-20", method: "Przelew", status: "paid" },
+];
+
+const INITIAL_TRANSACTIONS: TransactionData[] = [
+  { id: "t1", date: "12 Mar", type: "sub", desc: "Padel Vision Pro — anna_k", amount: "+39,00 zł", amountNum: 39, user: "anna_k", detail: "Subskrypcja Pro miesięczna" },
+  { id: "t2", date: "11 Mar", type: "ppv", desc: "PPV Silesia Open — 12 zakupów", amount: "+179,88 zł", amountNum: 179.88, detail: "12 × 14,99 zł" },
+  { id: "t3", date: "11 Mar", type: "bits", desc: "500 Piłek — jan_nowak", amount: "+19,99 zł", amountNum: 19.99, user: "jan_nowak", detail: "Pakiet 500 Piłek" },
+  { id: "t4", date: "10 Mar", type: "sub", desc: "Padel Vision Pass — 8 nowych", amount: "+152,00 zł", amountNum: 152, detail: "8 × 19 zł (Pass miesięczny)" },
+  { id: "t5", date: "10 Mar", type: "payout", desc: "Wypłata → Racket Club", amount: "-1 420 zł", amountNum: -1420, detail: "Stripe Connect payout" },
+  { id: "t6", date: "09 Mar", type: "club_plan", desc: "Plan Pro — Viva Padel", amount: "+249,00 zł", amountNum: 249, detail: "Plan Pro klubowy miesięczny" },
+  { id: "t7", date: "09 Mar", type: "bits", desc: "1000 Piłek — kasia_w", amount: "+34,99 zł", amountNum: 34.99, user: "kasia_w", detail: "Pakiet 1000 Piłek" },
+  { id: "t8", date: "08 Mar", type: "sub", desc: "Padel Vision Pro — tomek_l", amount: "+39,00 zł", amountNum: 39, user: "tomek_l", detail: "Subskrypcja Pro upgrade z Pass" },
+  { id: "t9", date: "08 Mar", type: "payout", desc: "Wypłata → Padel Kraków", amount: "-890 zł", amountNum: -890, detail: "Stripe Connect payout" },
+  { id: "t10", date: "07 Mar", type: "ppv", desc: "PPV Kraków Open — 8 zakupów", amount: "+119,92 zł", amountNum: 119.92, detail: "8 × 14,99 zł" },
+];
+
+const TX_TYPE_LABELS: Record<string, { label: string; color: string; icon: typeof CreditCard }> = {
+  all: { label: "Wszystkie", color: "text-text", icon: Receipt },
+  sub: { label: "Subskrypcje", color: "text-lime", icon: CreditCard },
+  ppv: { label: "PPV", color: "text-blue-400", icon: Film },
+  bits: { label: "Piłki", color: "text-yellow-400", icon: Coins },
+  payout: { label: "Wypłaty", color: "text-orange", icon: Wallet },
+  club_plan: { label: "Plany klubowe", color: "text-purple-400", icon: Building2 },
+};
+
+type PayoutSort = "club" | "amountNum" | "date" | "status";
+type TxSort = "date" | "amountNum" | "type";
+type SortDir = "asc" | "desc";
+
+/* ─── Component ──────────────────────────────────────── */
+
+export default function AdminFinancePage() {
+  const [dateRange, setDateRange] = useState<DateRange>("30d");
+  const [chartMetric, setChartMetric] = useState<ChartMetric>("mrr");
+  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+  const [payouts, setPayouts] = useState<PayoutData[]>(INITIAL_PAYOUTS);
+  const [transactions] = useState<TransactionData[]>(INITIAL_TRANSACTIONS);
+  const [txFilter, setTxFilter] = useState<TxFilter>("all");
+  const [txSort, setTxSort] = useState<TxSort>("date");
+  const [txSortDir, setTxSortDir] = useState<SortDir>("desc");
+  const [payoutSort, setPayoutSort] = useState<PayoutSort>("status");
+  const [payoutSortDir, setPayoutSortDir] = useState<SortDir>("asc");
+  const [toast, setToast] = useState<string | null>(null);
+  const [showPayoutConfirm, setShowPayoutConfirm] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
+  const [showTxDetail, setShowTxDetail] = useState<string | null>(null);
+  const [showRevenueDetail, setShowRevenueDetail] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-hide toast
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  const showToast = (msg: string) => setToast(msg);
+
+  /* ─── Chart ──────────────────────────────────── */
+
+  const chartData = CHART_DATA[chartMetric];
+  const maxChart = Math.max(...chartData.map((m) => m.amount));
+  const totalChart = chartData.reduce((s, m) => s + m.amount, 0);
+  const avgChart = Math.round(totalChart / chartData.length);
+
+  /* ─── Payouts ────────────────────────────────── */
+
+  const sortedPayouts = [...payouts].sort((a, b) => {
+    const dir = payoutSortDir === "asc" ? 1 : -1;
+    if (payoutSort === "amountNum") return (a.amountNum - b.amountNum) * dir;
+    if (payoutSort === "status") {
+      const order = { pending: 0, approved: 1, paid: 2, rejected: 3 };
+      return (order[a.status] - order[b.status]) * dir;
+    }
+    return String(a[payoutSort]).localeCompare(String(b[payoutSort])) * dir;
+  });
+
+  const pendingTotal = payouts
+    .filter((p) => p.status === "pending")
+    .reduce((s, p) => s + p.amountNum, 0);
+
+  const handlePayoutAction = (id: string, action: "approve" | "reject") => {
+    setPayouts((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, status: action === "approve" ? "approved" : "rejected" } : p
+      )
+    );
+    const payout = payouts.find((p) => p.id === id);
+    showToast(action === "approve" ? `Zatwierdzono wypłatę ${payout?.amount} dla ${payout?.club}` : `Odrzucono wypłatę dla ${payout?.club}`);
+    setShowPayoutConfirm(null);
+  };
+
+  const handleApproveAll = () => {
+    const pendingCount = payouts.filter((p) => p.status === "pending").length;
+    setPayouts((prev) =>
+      prev.map((p) => (p.status === "pending" ? { ...p, status: "approved" } : p))
+    );
+    showToast(`Zatwierdzono ${pendingCount} wypłat`);
+  };
+
+  /* ─── Transactions ───────────────────────────── */
+
+  const filteredTx = transactions
+    .filter((tx) => txFilter === "all" || tx.type === txFilter)
+    .sort((a, b) => {
+      const dir = txSortDir === "asc" ? 1 : -1;
+      if (txSort === "amountNum") return (a.amountNum - b.amountNum) * dir;
+      return String(a[txSort]).localeCompare(String(b[txSort])) * dir;
+    });
+
+  /* ─── Export ─────────────────────────────────── */
+
+  const handleExportCSV = () => {
+    const headers = "Data,Typ,Opis,Kwota\n";
+    const rows = filteredTx
+      .map((tx) => `${tx.date},${TX_TYPE_LABELS[tx.type]?.label || tx.type},"${tx.desc}",${tx.amount}`)
+      .join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "padelvision-finance.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Wyeksportowano CSV");
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      showToast("Dane odświeżone");
+    }, 1000);
+  };
+
+  /* ─── Render ───────────────────────────────────── */
+
+  const kpis = FINANCE_KPIS[dateRange];
+  const detailTx = showTxDetail ? transactions.find((t) => t.id === showTxDetail) : null;
+
+  return (
+    <div className="p-6">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed right-6 top-20 z-50 animate-in slide-in-from-right rounded-lg border border-lime/30 bg-bg2 px-4 py-3 text-sm text-lime shadow-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            {toast}
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-display text-2xl">Finanse</h1>
+          <p className="text-xs text-muted">Przegląd finansowy platformy</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Date Range */}
+          <div className="flex rounded-lg border border-border bg-bg3">
+            {(["7d", "30d", "90d", "12m"] as DateRange[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setDateRange(r)}
+                className={cn(
+                  "px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                  dateRange === r ? "bg-lime/20 text-lime" : "text-muted hover:text-text"
+                )}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg3 text-muted transition-colors hover:bg-bg4 hover:text-text"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg3 px-3 text-[11px] font-medium text-muted transition-colors hover:bg-bg4 hover:text-text"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <Link
+              key={kpi.label}
+              to={kpi.href}
+              className="glass-card p-4 transition-all hover:border-lime/30 hover:ring-1 hover:ring-lime/20"
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <Icon className={cn("h-5 w-5", kpi.color)} />
+                <span className={cn(
+                  "flex items-center gap-0.5 text-xs font-semibold",
+                  kpi.positive ? "text-emerald-400" : "text-red-400"
+                )}>
+                  {kpi.positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                  {kpi.change}
+                </span>
+              </div>
+              <p className="text-display text-2xl">{kpi.value}</p>
+              <p className="text-xs text-muted">{kpi.label}</p>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          {/* Revenue Chart */}
+          <div id="mrr" className="glass-card p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-text">
+                {CHART_LABELS[chartMetric]} — ostatnie 7 miesięcy
+              </h2>
+              <div className="flex rounded-lg border border-border bg-bg3">
+                {(["mrr", "transactions", "payouts"] as ChartMetric[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setChartMetric(m)}
+                    className={cn(
+                      "px-2.5 py-1 text-[10px] font-semibold transition-colors",
+                      chartMetric === m ? "bg-lime/20 text-lime" : "text-muted hover:text-text"
+                    )}
+                  >
+                    {m === "mrr" ? "MRR" : m === "transactions" ? "Transakcje" : "Wypłaty"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-end gap-3" style={{ height: 180 }}>
+              {chartData.map((m, i) => (
+                <div
+                  key={m.month}
+                  className="group relative flex flex-1 flex-col items-center gap-1"
+                  onMouseEnter={() => setHoveredBar(i)}
+                  onMouseLeave={() => setHoveredBar(null)}
+                >
+                  {/* Tooltip */}
+                  {hoveredBar === i && (
+                    <div className="absolute -top-10 z-10 rounded-lg border border-border bg-[#0B0C10] px-3 py-1.5 text-xs shadow-lg">
+                      <span className="font-mono font-semibold text-text">
+                        {chartMetric === "transactions"
+                          ? m.amount.toLocaleString()
+                          : (m.amount / 1000).toFixed(1) + "k zł"}
+                      </span>
+                    </div>
+                  )}
+                  <span className="font-mono text-[10px] text-muted">
+                    {chartMetric === "transactions" ? m.amount : (m.amount / 1000).toFixed(1) + "k"}
+                  </span>
+                  <div
+                    className={cn(
+                      "w-full cursor-pointer rounded-t transition-all",
+                      CHART_COLORS[chartMetric],
+                      hoveredBar === i && "opacity-100 ring-2 ring-lime/30",
+                      hoveredBar !== null && hoveredBar !== i && "opacity-50"
+                    )}
+                    style={{ height: `${(m.amount / maxChart) * 140}px` }}
+                  />
+                  <span className={cn(
+                    "text-[10px] transition-colors",
+                    hoveredBar === i ? "font-semibold text-lime" : "text-muted"
+                  )}>{m.month}</span>
+                </div>
+              ))}
+            </div>
+            {/* Summary Row */}
+            <div className="mt-4 flex gap-4 border-t border-border pt-3">
+              <div>
+                <p className="text-[10px] text-muted">Suma</p>
+                <p className="font-mono text-xs font-semibold text-text">
+                  {chartMetric === "transactions"
+                    ? totalChart.toLocaleString()
+                    : (totalChart / 1000).toFixed(1) + "k zł"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted">Średnia</p>
+                <p className="font-mono text-xs font-semibold text-text">
+                  {chartMetric === "transactions"
+                    ? avgChart.toLocaleString()
+                    : (avgChart / 1000).toFixed(1) + "k zł"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted">Zmiana</p>
+                <p className="font-mono text-xs font-semibold text-emerald-400">
+                  +{((chartData[chartData.length - 1].amount / chartData[0].amount - 1) * 100).toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Streams */}
+          <div id="revenue" className="glass-card p-4">
+            <h2 className="mb-4 text-sm font-semibold text-text">
+              Źródła przychodu
+            </h2>
+            <div className="space-y-3">
+              {REVENUE_STREAMS.map((src, i) => {
+                const Icon = src.icon;
+                const isExpanded = showRevenueDetail === i;
+                return (
+                  <div key={src.source}>
+                    <button
+                      onClick={() => setShowRevenueDetail(isExpanded ? null : i)}
+                      className="mb-1 flex w-full items-center justify-between transition-colors hover:text-lime"
+                    >
+                      <div className="flex items-center gap-2 text-xs">
+                        <Icon className="h-3.5 w-3.5 text-muted" />
+                        <span className="text-muted">{src.source}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-text">{src.amount}</span>
+                        <span className="rounded-full bg-bg4 px-1.5 py-0.5 text-[10px] text-muted">{src.pct}%</span>
+                        {isExpanded ? (
+                          <ChevronUp className="h-3 w-3 text-lime" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 text-muted" />
+                        )}
+                      </div>
+                    </button>
+                    <div className="h-2 overflow-hidden rounded-full bg-bg4">
+                      <div
+                        className={cn("h-full rounded-full transition-all", src.color)}
+                        style={{ width: `${src.pct}%` }}
+                      />
+                    </div>
+                    {/* Expanded detail */}
+                    {isExpanded && (
+                      <div className="mt-2 rounded-lg bg-bg3 p-3">
+                        <div className="grid grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <p className="text-[10px] text-muted">Miesięcznie</p>
+                            <p className="font-mono font-semibold text-text">{src.amount}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted">Rocznie (est.)</p>
+                            <p className="font-mono font-semibold text-text">{(src.amountNum * 12 / 1000).toFixed(0)}k zł</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted">Udział</p>
+                            <p className="font-mono font-semibold text-lime">{src.pct}%</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-[10px] text-muted">
+                          <TrendingUp className="h-3 w-3 text-emerald-400" />
+                          Wzrost +{(Math.random() * 15 + 5).toFixed(1)}% vs poprzedni miesiąc
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Total */}
+            <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+              <span className="text-xs text-muted">Łączny przychód</span>
+              <span className="font-mono text-sm font-bold text-lime">
+                {REVENUE_STREAMS.reduce((s, r) => s + r.amountNum, 0).toLocaleString()} zł
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Pending Payouts */}
+          <div className="glass-card overflow-visible">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-text">
+                Oczekujące wypłaty
+              </h2>
+              {payouts.filter((p) => p.status === "pending").length > 0 && (
+                <button
+                  onClick={handleApproveAll}
+                  className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/30"
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  Zatwierdź wszystkie
+                </button>
+              )}
+            </div>
+            <div className="divide-y divide-border">
+              {sortedPayouts.map((p) => {
+                const isPending = p.status === "pending";
+                const isApproved = p.status === "approved";
+                const isPaid = p.status === "paid";
+                const isRejected = p.status === "rejected";
+                return (
+                  <div key={p.id} className="px-4 py-2.5 transition-colors hover:bg-bg3/50">
+                    <div className="flex items-center justify-between">
+                      <Link
+                        to={`/club/${p.slug}`}
+                        className="text-xs font-medium text-text transition-colors hover:text-lime"
+                      >
+                        {p.club}
+                      </Link>
+                      <span className="font-mono text-xs text-orange">{p.amount}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-muted">{p.date} · {p.method}</p>
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
+                            isPending && "bg-yellow-500/20 text-yellow-400",
+                            isApproved && "bg-emerald-500/20 text-emerald-400",
+                            isPaid && "bg-blue-500/20 text-blue-400",
+                            isRejected && "bg-red-500/20 text-red-400"
+                          )}
+                        >
+                          {isPending ? "Oczekuje" : isApproved ? "Zatwierdzona" : isPaid ? "Wypłacona" : "Odrzucona"}
+                        </span>
+                      </div>
+                      {isPending && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setShowPayoutConfirm({ id: p.id, action: "approve" })}
+                            className="rounded p-1 text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                            title="Zatwierdź"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setShowPayoutConfirm({ id: p.id, action: "reject" })}
+                            className="rounded p-1 text-red-400 transition-colors hover:bg-red-500/20"
+                            title="Odrzuć"
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-border px-4 py-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted">Do wypłaty (oczekujące)</span>
+                <span className="font-mono text-sm font-bold text-orange">
+                  {pendingTotal.toLocaleString()} zł
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Transactions */}
+          <div className="glass-card overflow-visible">
+            <div className="border-b border-border px-4 py-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-text">
+                  Transakcje
+                </h2>
+                <span className="rounded-full bg-bg4 px-2 py-0.5 text-[10px] text-muted">
+                  {filteredTx.length}
+                </span>
+              </div>
+              {/* Filter chips */}
+              <div className="mt-2 flex flex-wrap gap-1">
+                {(Object.keys(TX_TYPE_LABELS) as TxFilter[]).map((t) => {
+                  const info = TX_TYPE_LABELS[t];
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setTxFilter(t)}
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors",
+                        txFilter === t
+                          ? "bg-lime/20 text-lime"
+                          : "bg-bg3 text-muted hover:text-text"
+                      )}
+                    >
+                      {info.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="divide-y divide-border">
+              {filteredTx.map((tx) => {
+                const typeInfo = TX_TYPE_LABELS[tx.type];
+                const Icon = typeInfo?.icon || Receipt;
+                return (
+                  <button
+                    key={tx.id}
+                    onClick={() => setShowTxDetail(tx.id)}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg3/50"
+                  >
+                    <div className={cn("flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-bg4")}>
+                      <Icon className={cn("h-3.5 w-3.5", typeInfo?.color)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-xs text-text">{tx.desc}</p>
+                      <p className="text-[10px] text-muted">{tx.date}</p>
+                    </div>
+                    <span
+                      className={cn(
+                        "flex-shrink-0 font-mono text-xs font-semibold",
+                        tx.amountNum >= 0 ? "text-emerald-400" : "text-red-400"
+                      )}
+                    >
+                      {tx.amount}
+                    </span>
+                  </button>
+                );
+              })}
+              {filteredTx.length === 0 && (
+                <div className="px-4 py-8 text-center text-xs text-muted">
+                  Brak transakcji tego typu
+                </div>
+              )}
+            </div>
+            <div className="border-t border-border px-4 py-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted">Suma widocznych</span>
+                <span className={cn(
+                  "font-mono text-sm font-bold",
+                  filteredTx.reduce((s, t) => s + t.amountNum, 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                )}>
+                  {filteredTx.reduce((s, t) => s + t.amountNum, 0) >= 0 ? "+" : ""}
+                  {filteredTx.reduce((s, t) => s + t.amountNum, 0).toFixed(2)} zł
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Payout Confirm Modal ───────────────── */}
+      {showPayoutConfirm && (() => {
+        const payout = payouts.find((p) => p.id === showPayoutConfirm.id);
+        if (!payout) return null;
+        const isApprove = showPayoutConfirm.action === "approve";
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onClick={() => setShowPayoutConfirm(null)}
+          >
+            <div
+              className="w-96 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center gap-3">
+                <div className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-full",
+                  isApprove ? "bg-emerald-500/20" : "bg-red-500/20"
+                )}>
+                  {isApprove ? (
+                    <Send className="h-5 w-5 text-emerald-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-400" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-display text-lg">
+                    {isApprove ? "Zatwierdź wypłatę" : "Odrzuć wypłatę"}
+                  </h3>
+                  <p className="text-xs text-muted">{payout.club}</p>
+                </div>
+              </div>
+              <div className="rounded-lg bg-bg3 p-3">
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-[10px] text-muted">Kwota</p>
+                    <p className="font-mono font-semibold text-orange">{payout.amount}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted">Data</p>
+                    <p className="text-text">{payout.date}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[10px] text-muted">Metoda</p>
+                    <p className="text-text">{payout.method}</p>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-muted">
+                {isApprove
+                  ? "Wypłata zostanie przetworzona przez Stripe Connect. Środki trafią na konto klubu w ciągu 2-3 dni roboczych."
+                  : "Odrzucona wypłata wróci do salda klubu. Czy na pewno chcesz odrzucić tę wypłatę?"}
+              </p>
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={() => setShowPayoutConfirm(null)}
+                  className="btn-secondary flex-1 py-2.5 text-sm"
+                >
+                  Anuluj
+                </button>
+                <button
+                  onClick={() => handlePayoutAction(payout.id, showPayoutConfirm.action)}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors",
+                    isApprove
+                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                      : "bg-red-500 text-white hover:bg-red-600"
+                  )}
+                >
+                  {isApprove ? "Zatwierdź" : "Odrzuć"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── Transaction Detail Modal ───────────── */}
+      {showTxDetail && detailTx && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setShowTxDetail(null)}
+        >
+          <div
+            className="w-96 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className={cn("flex h-10 w-10 items-center justify-center rounded-full bg-bg4")}>
+                {(() => {
+                  const Icon = TX_TYPE_LABELS[detailTx.type]?.icon || Receipt;
+                  return <Icon className={cn("h-5 w-5", TX_TYPE_LABELS[detailTx.type]?.color)} />;
+                })()}
+              </div>
+              <div>
+                <h3 className="text-display text-base">Szczegóły transakcji</h3>
+                <p className="text-xs text-muted">ID: {detailTx.id}</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-lg bg-bg3 p-3">
+                <p className="text-[10px] text-muted">Opis</p>
+                <p className="text-sm text-text">{detailTx.desc}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-bg3 p-3">
+                  <p className="text-[10px] text-muted">Kwota</p>
+                  <p className={cn(
+                    "font-mono text-lg font-semibold",
+                    detailTx.amountNum >= 0 ? "text-emerald-400" : "text-red-400"
+                  )}>
+                    {detailTx.amount}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-bg3 p-3">
+                  <p className="text-[10px] text-muted">Data</p>
+                  <p className="text-sm text-text">{detailTx.date} 2025</p>
+                </div>
+                <div className="rounded-lg bg-bg3 p-3">
+                  <p className="text-[10px] text-muted">Typ</p>
+                  <span className={cn("text-sm font-semibold", TX_TYPE_LABELS[detailTx.type]?.color)}>
+                    {TX_TYPE_LABELS[detailTx.type]?.label}
+                  </span>
+                </div>
+                {detailTx.user && (
+                  <div className="rounded-lg bg-bg3 p-3">
+                    <p className="text-[10px] text-muted">Użytkownik</p>
+                    <p className="text-sm text-text">{detailTx.user}</p>
+                  </div>
+                )}
+              </div>
+              {detailTx.detail && (
+                <div className="rounded-lg bg-bg3 p-3">
+                  <p className="text-[10px] text-muted">Szczegóły</p>
+                  <p className="text-sm text-text">{detailTx.detail}</p>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowTxDetail(null)}
+              className="btn-secondary mt-5 w-full py-2 text-sm"
+            >
+              Zamknij
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

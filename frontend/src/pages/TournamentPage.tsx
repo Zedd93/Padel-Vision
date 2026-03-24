@@ -1,304 +1,359 @@
-import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
-  CalendarDays,
+  Trophy,
+  Calendar,
   MapPin,
   Users,
-  Trophy,
-  Tag,
-  CreditCard,
-  ChevronLeft,
-  Monitor,
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { apiClient } from '@/api/client';
-import { formatDate, formatCurrency } from '@/utils/format';
-import Navbar from '@/components/layout/Navbar';
-import { cn } from '@/utils/cn';
+  Banknote,
+  Radio,
+  ArrowLeft,
+  Share2,
+  Eye,
+  BarChart3,
+  Target,
+} from "lucide-react";
+import { cn } from "@/utils/cn";
+import { LiveBracket, DEMO_BRACKET } from "@/components/tournaments/LiveBracket";
 
-interface Tournament {
-  id: string;
-  name: string;
-  format: string;
-  category: string;
-  level: string;
-  description: string | null;
-  location: string;
-  startDate: string;
-  endDate: string | null;
-  entryFee: number | null;
-  ppvPrice: number | null;
-  maxTeams: number | null;
-  registeredTeams: number;
-  status: 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED';
-  matches: TournamentMatch[];
+/* ─── Types ────────────────────────────────────── */
+
+interface Prediction {
+  matchId: string;
+  pick: "team1" | "team2";
 }
 
-interface TournamentMatch {
-  id: string;
-  round: number;
-  courtNumber: number | null;
-  team1Name: string;
-  team2Name: string;
-  score: { sets: { t1: number; t2: number }[] } | null;
-  winnerId: string | null;
-  scheduledAt: string | null;
-  status: 'SCHEDULED' | 'LIVE' | 'COMPLETED';
-}
+/* ─── Mock Data ────────────────────────────────── */
+
+const MOCK_TOURNAMENT = {
+  id: "silesia-open-2026",
+  name: "SILESIA OPEN 2026",
+  category: "OPEN A",
+  clubName: "Racket Club Katowice",
+  clubSlug: "racket-club-katowice",
+  location: "Katowice, Kort 1-4",
+  date: "13-14 marca 2026",
+  teams: 8,
+  prize: "10 000 zł",
+  status: "live" as "live" | "upcoming" | "past",
+  viewers: 3245,
+  description:
+    "Największy turniej padla na Śląsku. 8 najlepszych par z całej Polski walczy o tytuł mistrza i pulę nagród 10 000 zł.",
+};
+
+const PREDICTION_LEADERBOARD = [
+  { rank: 1, username: "PadelProphet", correct: 6, total: 7 },
+  { rank: 2, username: "AceHunter", correct: 5, total: 7 },
+  { rank: 3, username: "SmashKing99", correct: 5, total: 7 },
+  { rank: 4, username: "WarsawPadel", correct: 4, total: 7 },
+  { rank: 5, username: "GoldenPoint", correct: 3, total: 7 },
+];
+
+/* ─── Component ────────────────────────────────── */
 
 export default function TournamentPage() {
   const { id } = useParams<{ id: string }>();
+  const tournamentId = id || "silesia-open-2026";
 
-  const { data: tournament, isLoading } = useQuery({
-    queryKey: ['tournament', id],
-    queryFn: () =>
-      apiClient
-        .get<{ data: Tournament }>(`/api/tournaments/${id}`)
-        .then((r) => r.data.data),
-    enabled: !!id,
-  });
+  const [activeTab, setActiveTab] = useState<"bracket" | "predictions" | "info">("bracket");
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-pv-obsidian">
-        <Navbar />
-        <div className="flex items-center justify-center py-32">
-          <div className="w-8 h-8 border-2 border-pv-lime border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
+  const tournament = { ...MOCK_TOURNAMENT, id: tournamentId };
 
-  if (!tournament) {
-    return (
-      <div className="min-h-screen bg-pv-obsidian">
-        <Navbar />
-        <div className="text-center py-32">
-          <p className="text-pv-muted font-body text-lg">Turniej nie znaleziony</p>
-        </div>
-      </div>
-    );
-  }
-
-  const statusLabel: Record<string, { text: string; color: string }> = {
-    UPCOMING: { text: 'Nadchodzący', color: 'bg-pv-lime/20 text-pv-lime' },
-    IN_PROGRESS: { text: 'W trakcie', color: 'bg-pv-red/20 text-pv-red' },
-    COMPLETED: { text: 'Zakończony', color: 'bg-pv-muted/20 text-pv-muted' },
+  const handlePredict = (matchId: string, pick: "team1" | "team2") => {
+    setPredictions((prev) => {
+      const existing = prev.find((p) => p.matchId === matchId);
+      if (existing) {
+        return prev.map((p) =>
+          p.matchId === matchId ? { ...p, pick } : p
+        );
+      }
+      return [...prev, { matchId, pick }];
+    });
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    fetch(`${apiUrl}/api/tournaments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tournamentId, matchId, pick, action: "predict" }),
+    }).catch(() => {});
   };
 
-  const status = statusLabel[tournament.status] ?? statusLabel.UPCOMING;
-
-  // Group matches by round
-  const rounds = new Map<number, TournamentMatch[]>();
-  tournament.matches?.forEach((m) => {
-    const list = rounds.get(m.round) ?? [];
-    list.push(m);
-    rounds.set(m.round, list);
-  });
+  const tabs = [
+    { key: "bracket" as const, label: "Drabinka", icon: Trophy },
+    { key: "predictions" as const, label: "Typowania", icon: Target },
+    { key: "info" as const, label: "Informacje", icon: BarChart3 },
+  ];
 
   return (
-    <div className="min-h-screen bg-pv-obsidian">
-      <Navbar />
-
-      <main className="max-w-5xl mx-auto px-4 py-6">
+    <div className="p-4 md:p-6">
+      <div className="mx-auto max-w-5xl">
         {/* Back link */}
         <Link
           to="/browse"
-          className="inline-flex items-center gap-1 text-pv-muted hover:text-pv-lime text-sm font-body mb-6 transition-colors"
+          className="mb-4 inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-text"
         >
-          <ChevronLeft className="w-4 h-4" />
-          Powrót
+          <ArrowLeft className="h-4 w-4" />
+          Wróć do odkrywania
         </Link>
 
-        {/* Header */}
-        <div className="bg-pv-surface rounded-2xl border border-pv-border p-6 mb-6">
-          <div className="flex flex-wrap items-start gap-3 mb-4">
-            <h1 className="font-display text-3xl text-pv-white tracking-wider flex-1">
+        {/* Tournament header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              {tournament.status === "live" && (
+                <span className="badge-live flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                  NA ŻYWO
+                </span>
+              )}
+              <span className="rounded bg-bg4 px-2 py-0.5 text-[10px] font-bold text-muted">
+                {tournament.category}
+              </span>
+            </div>
+            <h1 className="text-display text-2xl lg:text-3xl">
               {tournament.name}
             </h1>
-            <span className={cn('px-3 py-1 rounded-full text-xs font-display tracking-wider', status.color)}>
-              {status.text}
-            </span>
-          </div>
-
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2 mb-5">
-            <span className="bg-pv-surface-2 text-pv-white text-xs font-body px-3 py-1 rounded-full flex items-center gap-1.5">
-              <Trophy className="w-3.5 h-3.5 text-pv-lime" />
-              {tournament.format}
-            </span>
-            <span className="bg-pv-surface-2 text-pv-white text-xs font-body px-3 py-1 rounded-full flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-pv-lime" />
-              {tournament.category}
-            </span>
-            <span className="bg-pv-surface-2 text-pv-white text-xs font-body px-3 py-1 rounded-full">
-              Poziom: {tournament.level}
-            </span>
-          </div>
-
-          {/* Info grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <CalendarDays className="w-5 h-5 text-pv-lime flex-shrink-0" />
-              <div>
-                <p className="text-pv-muted text-xs font-body">Data</p>
-                <p className="text-pv-white text-sm font-body">
-                  {formatDate(tournament.startDate)}
-                  {tournament.endDate && ` — ${formatDate(tournament.endDate)}`}
-                </p>
-              </div>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted">
+              <Link
+                to={`/club/${tournament.clubSlug}`}
+                className="flex items-center gap-1 text-lime hover:underline"
+              >
+                <Radio className="h-3.5 w-3.5" />
+                {tournament.clubName}
+              </Link>
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                {tournament.location}
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                {tournament.date}
+              </span>
             </div>
-
-            <div className="flex items-center gap-3">
-              <MapPin className="w-5 h-5 text-pv-lime flex-shrink-0" />
-              <div>
-                <p className="text-pv-muted text-xs font-body">Lokalizacja</p>
-                <p className="text-pv-white text-sm font-body">{tournament.location}</p>
-              </div>
-            </div>
-
-            {tournament.entryFee != null && (
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-5 h-5 text-pv-lime flex-shrink-0" />
-                <div>
-                  <p className="text-pv-muted text-xs font-body">Wpisowe</p>
-                  <p className="text-pv-white text-sm font-body">
-                    {formatCurrency(tournament.entryFee)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {tournament.ppvPrice != null && (
-              <div className="flex items-center gap-3">
-                <Monitor className="w-5 h-5 text-pv-lime flex-shrink-0" />
-                <div>
-                  <p className="text-pv-muted text-xs font-body">PPV</p>
-                  <p className="text-pv-white text-sm font-body">
-                    {formatCurrency(tournament.ppvPrice)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {tournament.maxTeams && (
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-pv-lime flex-shrink-0" />
-                <div>
-                  <p className="text-pv-muted text-xs font-body">Drużyny</p>
-                  <p className="text-pv-white text-sm font-body">
-                    {tournament.registeredTeams} / {tournament.maxTeams}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
-          {tournament.description && (
-            <p className="text-pv-muted font-body text-sm mt-4 leading-relaxed">
-              {tournament.description}
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            {tournament.status === "live" && (
+              <span className="flex items-center gap-1.5 rounded-lg bg-bg3 px-3 py-2 text-sm text-muted">
+                <Eye className="h-4 w-4" />
+                {tournament.viewers.toLocaleString("pl-PL")} widzów
+              </span>
+            )}
+            <button className="rounded-lg p-2 text-muted hover:bg-bg3 hover:text-text">
+              <Share2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Bracket / Matches */}
-        <h2 className="font-display text-2xl text-pv-white tracking-wider mb-4">
-          DRABINKA
-        </h2>
-
-        {rounds.size === 0 ? (
-          <div className="bg-pv-surface rounded-xl border border-pv-border p-8 text-center">
-            <p className="text-pv-muted font-body">
-              Drabinka zostanie opublikowana wkrótce
-            </p>
+        {/* Quick stats */}
+        <div className="mb-6 grid grid-cols-3 gap-3">
+          <div className="glass-card flex items-center gap-3 p-3">
+            <Users className="h-5 w-5 text-lime" />
+            <div>
+              <p className="text-lg font-bold text-text">{tournament.teams}</p>
+              <p className="text-[10px] text-muted">par</p>
+            </div>
           </div>
-        ) : (
-          <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide">
-            {Array.from(rounds.entries())
-              .sort(([a], [b]) => a - b)
-              .map(([round, matches]) => (
-                <div key={round} className="flex-shrink-0 w-72">
-                  <h3 className="text-pv-muted text-xs font-display tracking-wider mb-3">
-                    RUNDA {round}
-                  </h3>
-                  <div className="space-y-3">
-                    {matches.map((match) => (
-                      <MatchCard key={match.id} match={match} />
-                    ))}
+          <div className="glass-card flex items-center gap-3 p-3">
+            <Banknote className="h-5 w-5 text-lime" />
+            <div>
+              <p className="text-lg font-bold text-text">{tournament.prize}</p>
+              <p className="text-[10px] text-muted">pula nagród</p>
+            </div>
+          </div>
+          <div className="glass-card flex items-center gap-3 p-3">
+            <Trophy className="h-5 w-5 text-lime" />
+            <div>
+              <p className="text-lg font-bold text-text">
+                {DEMO_BRACKET.filter((m) => m.status === "completed").length}/
+                {DEMO_BRACKET.length}
+              </p>
+              <p className="text-[10px] text-muted">meczów rozegranych</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-6 flex gap-2 border-b border-border">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  "flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                  activeTab === tab.key
+                    ? "border-lime text-lime"
+                    : "border-transparent text-muted hover:text-text"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tab content */}
+        {activeTab === "bracket" && (
+          <LiveBracket
+            matches={DEMO_BRACKET}
+            tournamentName={tournament.name}
+          />
+        )}
+
+        {activeTab === "predictions" && (
+          <div className="space-y-6">
+            {/* Predictions intro */}
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-5 w-5 text-lime" />
+                <h3 className="text-sm font-semibold text-text">
+                  Typuj wyniki meczów!
+                </h3>
+              </div>
+              <p className="text-xs text-muted">
+                Kliknij na drużynę, którą typujesz jako zwycięzcę. Najlepsi
+                typerzy trafiają na leaderboard!
+              </p>
+            </div>
+
+            {/* Pending matches to predict */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-text">
+                Nadchodzące mecze
+              </h3>
+              <div className="space-y-2">
+                {DEMO_BRACKET.filter((m) => m.status === "pending" && m.team1 && m.team2).map(
+                  (match) => {
+                    const userPick = predictions.find(
+                      (p) => p.matchId === match.id
+                    )?.pick;
+                    return (
+                      <div
+                        key={match.id}
+                        className="glass-card flex items-center gap-3 p-3"
+                      >
+                        <button
+                          onClick={() => handlePredict(match.id, "team1")}
+                          className={cn(
+                            "flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all",
+                            userPick === "team1"
+                              ? "bg-lime/20 text-lime border border-lime/30"
+                              : "bg-bg3 text-text hover:bg-bg4"
+                          )}
+                        >
+                          {match.team1}
+                        </button>
+                        <span className="text-xs text-muted">vs</span>
+                        <button
+                          onClick={() => handlePredict(match.id, "team2")}
+                          className={cn(
+                            "flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-all",
+                            userPick === "team2"
+                              ? "bg-lime/20 text-lime border border-lime/30"
+                              : "bg-bg3 text-text hover:bg-bg4"
+                          )}
+                        >
+                          {match.team2}
+                        </button>
+                      </div>
+                    );
+                  }
+                )}
+                {DEMO_BRACKET.filter((m) => m.status === "pending" && m.team1 && m.team2).length === 0 && (
+                  <p className="text-xs text-muted">
+                    Brak dostępnych meczów do typowania — poczekaj na wyniki bieżących spotkań.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Leaderboard */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-text">
+                Leaderboard typerów
+              </h3>
+              <div className="glass-card overflow-hidden">
+                {PREDICTION_LEADERBOARD.map((entry) => (
+                  <div
+                    key={entry.rank}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-2.5",
+                      entry.rank <= 3 && "bg-lime/[0.02]"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
+                        entry.rank === 1
+                          ? "bg-yellow-500 text-black"
+                          : entry.rank === 2
+                            ? "bg-gray-300 text-black"
+                            : entry.rank === 3
+                              ? "bg-orange text-black"
+                              : "bg-bg4 text-muted"
+                      )}
+                    >
+                      {entry.rank}
+                    </span>
+                    <span className="flex-1 text-sm font-medium text-text">
+                      {entry.username}
+                    </span>
+                    <span className="font-mono text-sm text-lime">
+                      {entry.correct}/{entry.total}
+                    </span>
+                    <span className="text-xs text-muted">
+                      ({Math.round((entry.correct / entry.total) * 100)}%)
+                    </span>
                   </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "info" && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="glass-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-text">Opis</h3>
+              <p className="text-xs leading-relaxed text-muted">
+                {tournament.description}
+              </p>
+            </div>
+            <div className="glass-card p-4">
+              <h3 className="mb-2 text-sm font-semibold text-text">
+                Szczegóły
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted">Organizator</span>
+                  <Link
+                    to={`/club/${tournament.clubSlug}`}
+                    className="text-lime hover:underline"
+                  >
+                    {tournament.clubName}
+                  </Link>
                 </div>
-              ))}
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function MatchCard({ match }: { match: TournamentMatch }) {
-  const isLive = match.status === 'LIVE';
-  const isCompleted = match.status === 'COMPLETED';
-
-  return (
-    <div
-      className={cn(
-        'bg-pv-surface rounded-xl border p-3',
-        isLive ? 'border-pv-red/50' : 'border-pv-border'
-      )}
-    >
-      {/* Status */}
-      <div className="flex items-center justify-between mb-2">
-        {match.courtNumber && (
-          <span className="text-pv-muted text-xs font-body">
-            Kort {match.courtNumber}
-          </span>
-        )}
-        {isLive && (
-          <span className="flex items-center gap-1 text-pv-red text-xs font-display tracking-wider">
-            <span className="w-1.5 h-1.5 bg-pv-red rounded-full animate-pulse" />
-            LIVE
-          </span>
-        )}
-        {isCompleted && (
-          <span className="text-pv-muted text-xs font-body">Zakończony</span>
-        )}
-      </div>
-
-      {/* Team 1 */}
-      <div className={cn(
-        'flex items-center justify-between py-1.5',
-        isCompleted && match.winnerId && match.winnerId === match.id
-          ? 'text-pv-lime'
-          : 'text-pv-white'
-      )}>
-        <span className="font-body text-sm truncate flex-1">
-          {match.team1Name || 'TBD'}
-        </span>
-        {match.score?.sets && (
-          <div className="flex gap-2 ml-2">
-            {match.score.sets.map((set, i) => (
-              <span key={i} className="font-mono text-sm w-4 text-center">
-                {set.t1}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="h-px bg-pv-border my-0.5" />
-
-      {/* Team 2 */}
-      <div className="flex items-center justify-between py-1.5 text-pv-white">
-        <span className="font-body text-sm truncate flex-1">
-          {match.team2Name || 'TBD'}
-        </span>
-        {match.score?.sets && (
-          <div className="flex gap-2 ml-2">
-            {match.score.sets.map((set, i) => (
-              <span key={i} className="font-mono text-sm w-4 text-center">
-                {set.t2}
-              </span>
-            ))}
+                <div className="flex justify-between">
+                  <span className="text-muted">Kategoria</span>
+                  <span className="text-text">{tournament.category}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Lokalizacja</span>
+                  <span className="text-text">{tournament.location}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Data</span>
+                  <span className="text-text">{tournament.date}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">Pula nagród</span>
+                  <span className="font-bold text-lime">{tournament.prize}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

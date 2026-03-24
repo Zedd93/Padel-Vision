@@ -2,47 +2,184 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
-  --pv-obsidian: #0B0C10;
-  --pv-surface: #1C1D26;
-  --pv-surface-2: #252632;
-  --pv-lime: #C8FF00;
-  --pv-red: #FF3B3B;
-  --pv-orange: #FF6A00;
-  --pv-white: #F0F0F0;
-  --pv-muted: #7A7B8A;
-  --pv-border: rgba(200, 255, 0, 0.13);
+  --bg: 11 12 16;
+  --bg2: 19 20 26;
+  --bg3: 28 29 38;
+  --bg4: 37 38 51;
+  --border: 42 43 56;
+  --lime: 200 255 0;
+  --lime2: 159 204 0;
+  --live: 255 59 59;
+  --orange: 255 106 0;
+  --text: 238 238 245;
+  --muted: 120 120 160;
+  --card: 22 23 31;
 }
 
 * {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
+html {
+  color-scheme: dark;
+}
+
+html,
 body {
-  font-family: 'DM Sans', sans-serif;
-  background-color: var(--pv-obsidian);
-  color: var(--pv-white);
+  background-color: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: "DM Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
+/* Force dark backgrounds on all form inputs */
+input,
+select,
+textarea {
+  color-scheme: dark;
+  background-color: rgb(var(--bg3));
+  color: rgb(var(--text));
+}
+
+/* ─── Scrollbar ───────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--pv-surface);
+  background: rgb(var(--bg2));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--pv-muted);
+  background: rgb(var(--bg4));
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--pv-lime);
+  background: rgb(var(--muted));
+}
+
+/* ─── Autofill Override ───────────────────────────────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px rgb(var(--bg3)) inset !important;
+  -webkit-text-fill-color: rgb(var(--text)) !important;
+  caret-color: rgb(var(--text));
+}
+
+/* ─── Selection ───────────────────────────────────────── */
+::selection {
+  background-color: rgb(var(--lime) / 0.2);
+  color: rgb(var(--lime));
+}
+
+/* ─── Utility Classes ─────────────────────────────────── */
+@layer components {
+  .glass-card {
+    @apply bg-card border border-border rounded-card;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200;
+  }
+
+  .glass-card-hover:hover {
+    border-color: rgb(var(--lime));
+    transform: translateY(-4px);
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 font-bold text-black rounded-lg transition-colors duration-200;
+    background-color: rgb(var(--lime));
+    font-weight: 700;
+  }
+
+  .btn-primary:hover {
+    background-color: rgb(var(--lime2));
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 font-semibold rounded-lg border transition-colors duration-200;
+    border-color: rgb(var(--border));
+    color: rgb(var(--text));
+  }
+
+  .btn-secondary:hover {
+    border-color: rgb(var(--lime));
+    color: rgb(var(--lime));
+  }
+
+  .badge-live {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-white rounded uppercase tracking-wider;
+    background-color: rgb(var(--live));
+    font-family: "Bebas Neue", sans-serif;
+  }
+
+  .text-display {
+    font-family: "Bebas Neue", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* ─── Live Pulse Animation ────────────────────────────── */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-live-pulse {
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Score Pulse Animation ───────────────────────────── */
+@keyframes score-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.animate-score-pulse {
+  animation: score-pulse 0.3s ease-in-out;
+}
+
+/* ─── Leaflet Map Overrides ─────────────────────────── */
+.club-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgb(var(--bg2)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-tip {
+  background: rgb(var(--bg2)) !important;
+  border: 1px solid rgb(var(--border)) !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px !important;
+  color: rgb(var(--text)) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgb(var(--bg2)) !important;
+  color: rgb(var(--text)) !important;
+  border-color: rgb(var(--border)) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgb(var(--bg3)) !important;
 }

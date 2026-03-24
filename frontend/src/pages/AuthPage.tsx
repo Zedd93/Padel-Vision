@@ -1,8 +1,8 @@
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/utils/cn';
-import { Eye, EyeOff, Mail, Lock, User, UserCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export default function AuthPage() {
   const location = useLocation();
@@ -12,181 +12,269 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState('');
 
   const isPending = isLoggingIn || isRegistering;
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (isRegister) {
-      register({ email, password, username, name: name || undefined });
-    } else {
-      login({ email, password });
+  const inputClass = (field: string) =>
+    `w-full rounded-lg border ${errors[field] ? 'border-live' : 'border-border'} bg-bg3 px-4 py-2.5 text-sm text-text placeholder:text-muted focus:border-lime focus:outline-none focus:ring-1 focus:ring-lime/30`;
+
+  const validate = () => {
+    const errs: Record<string, string> = {};
+    if (!email.trim()) {
+      errs.email = 'Podaj adres email';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errs.email = 'Podaj poprawny adres email';
     }
-  }
+    if (!password) {
+      errs.password = 'Podaj hasło';
+    } else if (isRegister && password.length < 8) {
+      errs.password = 'Hasło musi mieć min. 8 znaków';
+    }
+    if (isRegister) {
+      if (!username.trim()) {
+        errs.username = 'Nazwa użytkownika jest wymagana';
+      } else if (username.trim().length < 3) {
+        errs.username = 'Nazwa musi mieć min. 3 znaki';
+      }
+      if (!confirmPassword) {
+        errs.confirmPassword = 'Potwierdź hasło';
+      } else if (password !== confirmPassword) {
+        errs.confirmPassword = 'Hasła nie są identyczne';
+      }
+    }
+    return errs;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const validationErrors = validate();
+    setErrors(validationErrors);
+    setServerError('');
+    if (Object.keys(validationErrors).length > 0) return;
+
+    if (isRegister) {
+      register({ email: email.trim(), password, username: username.trim() });
+    } else {
+      login({ email: email.trim(), password });
+    }
+  };
+
+  const clearFieldError = (field: string) => {
+    if (errors[field]) {
+      setErrors((prev) => {
+        const n = { ...prev };
+        delete n[field];
+        return n;
+      });
+    }
+    if (serverError) setServerError('');
+  };
 
   return (
-    <div className="min-h-screen bg-pv-obsidian flex items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="font-display text-5xl text-pv-lime tracking-wider">
-            PADEL VISION
-          </h1>
-          <p className="text-pv-muted font-body mt-2">
-            {isRegister ? 'Utwórz nowe konto' : 'Zaloguj się do swojego konta'}
-          </p>
-        </div>
+        <div className="glass-card p-8">
+          <div className="mb-6 text-center">
+            <Link to="/" className="text-display text-3xl text-lime transition-opacity hover:opacity-80">
+              PADEL VISION
+            </Link>
+            <p className="mt-2 text-sm text-muted">
+              {isRegister ? 'Utwórz nowe konto' : 'Zaloguj się do swojego konta'}
+            </p>
+          </div>
 
-        {/* Card */}
-        <div className="bg-pv-surface rounded-2xl p-8 border border-pv-border">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name (register only) */}
-            {isRegister && (
-              <div>
-                <label className="block text-pv-muted text-sm font-body mb-1.5">
-                  Imię i nazwisko
-                </label>
-                <div className="relative">
-                  <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-pv-muted" />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Jan Kowalski"
-                    className="w-full bg-pv-surface-2 border border-pv-border rounded-lg py-3 pl-11 pr-4 text-pv-white font-body placeholder:text-pv-muted/50 focus:outline-none focus:border-pv-lime/40 transition-colors"
-                  />
-                </div>
-              </div>
-            )}
+          {serverError && (
+            <div className="mb-4 rounded-lg border border-live/30 bg-live/10 px-4 py-3 text-sm text-live">
+              {serverError}
+            </div>
+          )}
 
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
             {/* Username (register only) */}
             {isRegister && (
               <div>
-                <label className="block text-pv-muted text-sm font-body mb-1.5">
+                <label htmlFor="register-username" className="mb-1 block text-sm text-muted">
                   Nazwa użytkownika
                 </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-pv-muted" />
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="jankowalski"
-                    required
-                    className="w-full bg-pv-surface-2 border border-pv-border rounded-lg py-3 pl-11 pr-4 text-pv-white font-body placeholder:text-pv-muted/50 focus:outline-none focus:border-pv-lime/40 transition-colors"
-                  />
-                </div>
+                <input
+                  id="register-username"
+                  name="username"
+                  type="text"
+                  required
+                  autoComplete="username"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    clearFieldError('username');
+                  }}
+                  disabled={isPending}
+                  className={inputClass('username')}
+                  placeholder="padelmaster"
+                />
+                {errors.username && (
+                  <p className="mt-1 text-xs text-live">{errors.username}</p>
+                )}
               </div>
             )}
 
             {/* Email */}
             <div>
-              <label className="block text-pv-muted text-sm font-body mb-1.5">
+              <label htmlFor="auth-email" className="mb-1 block text-sm text-muted">
                 Email
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-pv-muted" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="jan@example.com"
-                  required
-                  className="w-full bg-pv-surface-2 border border-pv-border rounded-lg py-3 pl-11 pr-4 text-pv-white font-body placeholder:text-pv-muted/50 focus:outline-none focus:border-pv-lime/40 transition-colors"
-                />
-              </div>
+              <input
+                id="auth-email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearFieldError('email');
+                }}
+                disabled={isPending}
+                className={inputClass('email')}
+                placeholder="twoj@email.pl"
+              />
+              {errors.email && (
+                <p className="mt-1 text-xs text-live">{errors.email}</p>
+              )}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-pv-muted text-sm font-body mb-1.5">
+              <label htmlFor="auth-password" className="mb-1 block text-sm text-muted">
                 Hasło
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-pv-muted" />
                 <input
+                  id="auth-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
                   required
-                  minLength={8}
-                  className="w-full bg-pv-surface-2 border border-pv-border rounded-lg py-3 pl-11 pr-11 text-pv-white font-body placeholder:text-pv-muted/50 focus:outline-none focus:border-pv-lime/40 transition-colors"
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    clearFieldError('password');
+                  }}
+                  disabled={isPending}
+                  className={inputClass('password')}
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-pv-muted hover:text-pv-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition-colors hover:text-text"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-xs text-live">{errors.password}</p>
+              )}
             </div>
 
-            {/* Submit */}
+            {/* Confirm Password (register only) */}
+            {isRegister && (
+              <div>
+                <label htmlFor="auth-confirmPassword" className="mb-1 block text-sm text-muted">
+                  Potwierdź hasło
+                </label>
+                <div className="relative">
+                  <input
+                    id="auth-confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirm ? 'text' : 'password'}
+                    required
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      clearFieldError('confirmPassword');
+                    }}
+                    disabled={isPending}
+                    className={inputClass('confirmPassword')}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition-colors hover:text-text"
+                  >
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-xs text-live">{errors.confirmPassword}</p>
+                )}
+              </div>
+            )}
+
+            {/* Forgot password (login only) */}
+            {!isRegister && (
+              <div className="flex justify-end">
+                <Link to="/forgot-password" className="text-xs text-lime hover:underline">
+                  Nie pamiętasz hasła?
+                </Link>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isPending}
-              className={cn(
-                'w-full bg-pv-lime text-black font-display text-xl tracking-wider py-3 rounded-lg',
-                'hover:brightness-110 active:scale-[0.98] transition-all',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
+              className="btn-primary flex w-full items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isPending
-                ? (isRegister ? 'REJESTRACJA...' : 'LOGOWANIE...')
-                : (isRegister ? 'ZAREJESTRUJ SIĘ' : 'ZALOGUJ SIĘ')}
+              {isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {isRegister ? 'Tworzenie konta...' : 'Logowanie...'}
+                </>
+              ) : (
+                isRegister ? 'Utwórz konto' : 'Zaloguj się'
+              )}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-pv-border" />
-            <span className="text-pv-muted text-sm font-body">lub</span>
-            <div className="flex-1 h-px bg-pv-border" />
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted">lub</span>
+            <div className="h-px flex-1 bg-border" />
           </div>
 
-          {/* Google OAuth placeholder */}
-          <button
-            type="button"
-            className="w-full bg-pv-surface-2 border border-pv-border rounded-lg py-3 px-4 text-pv-white font-body hover:bg-pv-surface-2/80 transition-colors flex items-center justify-center gap-3"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            Kontynuuj z Google
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              disabled={isPending}
+              className="btn-secondary w-full disabled:opacity-50"
+            >
+              Kontynuuj z Google
+            </button>
+            {!isRegister && (
+              <button className="btn-secondary w-full" disabled>
+                Kontynuuj z Facebook
+              </button>
+            )}
+          </div>
 
-          {/* Toggle link */}
-          <p className="text-center text-pv-muted font-body mt-6">
+          <p className="mt-6 text-center text-sm text-muted">
             {isRegister ? (
               <>
                 Masz już konto?{' '}
-                <Link to="/login" className="text-pv-lime hover:underline">
+                <Link to="/login" className="text-lime hover:underline">
                   Zaloguj się
                 </Link>
               </>
             ) : (
               <>
                 Nie masz konta?{' '}
-                <Link to="/register" className="text-pv-lime hover:underline">
+                <Link to="/register" className="text-lime hover:underline">
                   Zarejestruj się
                 </Link>
               </>
