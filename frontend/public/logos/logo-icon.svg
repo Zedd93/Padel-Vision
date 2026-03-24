@@ -1,7 +1,21 @@
 <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-  <!-- 2B FILLED LENS — Icon only (48px, favicons, small contexts) -->
+  <!-- 2B FILLED LENS — Icon 48px -->
   <rect width="48" height="48" rx="11" fill="#0B0C10"/>
-  <rect x="12" y="8" width="24" height="24" rx="7" fill="#C8FF00"/>
-  <path d="M18,11 L24,26 L30,11" fill="#0B0C10" stroke="#0B0C10" stroke-width="2" stroke-linejoin="round"/>
-  <rect x="21" y="32" width="6" height="8" rx="2" fill="#C8FF00"/>
+  <defs>
+    <linearGradient id="ai2bi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C8FF00"/><stop offset="100%" stop-color="#A0D900"/>
+    </linearGradient>
+  </defs>
+  <!-- Filled racket head -->
+  <rect x="10" y="6" width="28" height="28" rx="8" fill="url(#ai2bi)"/>
+  <!-- Grid lines -->
+  <line x1="19" y1="6" x2="19" y2="34" stroke="#0B0C10" stroke-width="0.8" opacity="0.2"/>
+  <line x1="29" y1="6" x2="29" y2="34" stroke="#0B0C10" stroke-width="0.8" opacity="0.2"/>
+  <line x1="10" y1="16" x2="38" y2="16" stroke="#0B0C10" stroke-width="0.8" opacity="0.2"/>
+  <line x1="10" y1="25" x2="38" y2="25" stroke="#0B0C10" stroke-width="0.8" opacity="0.2"/>
+  <!-- Center lens -->
+  <circle cx="24" cy="18" r="6" fill="#0B0C10" opacity="0.35"/>
+  <circle cx="24" cy="18" r="2.5" fill="#0B0C10" opacity="0.5"/>
+  <!-- Handle -->
+  <rect x="21" y="34" width="6" height="8" rx="2" fill="url(#ai2bi)"/>
 </svg>

@@ -560,11 +560,22 @@ function UserMenu() {
 function PadelVisionLogo() {
   return (
     <div className="flex items-center gap-1.5">
-      {/* 2B Filled Lens — racket mark */}
-      <svg width="32" height="42" viewBox="0 0 36 48" className="shrink-0">
-        <rect x="0" y="0" width="36" height="36" rx="10" fill="#C8FF00"/>
-        <path d="M9,5 L18,28 L27,5" fill="#0B0C10" stroke="#0B0C10" strokeWidth="2" strokeLinejoin="round"/>
-        <rect x="14" y="36" width="8" height="12" rx="3" fill="#C8FF00"/>
+      {/* 2B Filled Lens — racket with grid + lens circle */}
+      <svg width="30" height="40" viewBox="0 0 36 52" className="shrink-0">
+        <defs>
+          <linearGradient id="lgNav" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#C8FF00"/><stop offset="100%" stopColor="#A0D900"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="36" height="36" rx="10" fill="url(#lgNav)"/>
+        <line x1="12" y1="0" x2="12" y2="36" stroke="#0B0C10" strokeWidth="0.9" opacity="0.2"/>
+        <line x1="24" y1="0" x2="24" y2="36" stroke="#0B0C10" strokeWidth="0.9" opacity="0.2"/>
+        <line x1="0" y1="12" x2="36" y2="12" stroke="#0B0C10" strokeWidth="0.9" opacity="0.2"/>
+        <line x1="0" y1="24" x2="36" y2="24" stroke="#0B0C10" strokeWidth="0.9" opacity="0.2"/>
+        <circle cx="18" cy="15" r="7" fill="#0B0C10" opacity="0.35"/>
+        <circle cx="18" cy="15" r="3" fill="#0B0C10" opacity="0.5"/>
+        <rect x="14" y="36" width="8" height="14" rx="3" fill="url(#lgNav)"/>
+        <line x1="18" y1="37" x2="18" y2="49" stroke="#0B0C10" strokeWidth="0.7" opacity="0.15"/>
       </svg>
       <div className="flex flex-col leading-none -space-y-0.5">
         <span className="font-display text-[15px] tracking-[3px] text-lime">PADEL</span>

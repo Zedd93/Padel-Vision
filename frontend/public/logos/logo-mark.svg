@@ -1,6 +1,21 @@
-<svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">
-  <!-- 2B FILLED LENS — Mark only, no text (for tight spaces, watermarks) -->
-  <rect x="0" y="0" width="36" height="36" rx="10" fill="#C8FF00"/>
-  <path d="M9,5 L18,28 L27,5" fill="#0B0C10" stroke="#0B0C10" stroke-width="2" stroke-linejoin="round"/>
-  <rect x="14" y="36" width="8" height="12" rx="3" fill="#C8FF00"/>
+<svg width="36" height="52" viewBox="0 0 36 52" xmlns="http://www.w3.org/2000/svg">
+  <!-- 2B FILLED LENS — Mark only -->
+  <defs>
+    <linearGradient id="lgm2b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C8FF00"/><stop offset="100%" stop-color="#A0D900"/>
+    </linearGradient>
+  </defs>
+  <!-- Filled racket head -->
+  <rect x="0" y="0" width="36" height="36" rx="10" fill="url(#lgm2b)"/>
+  <!-- Grid lines -->
+  <line x1="12" y1="0" x2="12" y2="36" stroke="#0B0C10" stroke-width="0.9" opacity="0.2"/>
+  <line x1="24" y1="0" x2="24" y2="36" stroke="#0B0C10" stroke-width="0.9" opacity="0.2"/>
+  <line x1="0" y1="12" x2="36" y2="12" stroke="#0B0C10" stroke-width="0.9" opacity="0.2"/>
+  <line x1="0" y1="24" x2="36" y2="24" stroke="#0B0C10" stroke-width="0.9" opacity="0.2"/>
+  <!-- Center lens -->
+  <circle cx="18" cy="15" r="7" fill="#0B0C10" opacity="0.35"/>
+  <circle cx="18" cy="15" r="3" fill="#0B0C10" opacity="0.5"/>
+  <!-- Handle -->
+  <rect x="14" y="36" width="8" height="14" rx="3" fill="url(#lgm2b)"/>
+  <line x1="18" y1="37" x2="18" y2="49" stroke="#0B0C10" stroke-width="0.7" opacity="0.15"/>
 </svg>
