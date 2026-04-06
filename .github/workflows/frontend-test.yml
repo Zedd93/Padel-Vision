@@ -1,21 +1,15 @@
-name: Frontend CI
+name: "Frontend: Test"
 
 on:
-  push:
-    branches: [main]
-    paths: ['frontend/**']
-  pull_request:
-    branches: [main]
+  workflow_call:
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -25,14 +19,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Lint
-        working-directory: frontend
-        run: npm run lint
-
       - name: Run tests
         working-directory: frontend
         run: npm run test -- --passWithNoTests
-
-      - name: Build
-        working-directory: frontend
-        run: npm run build
