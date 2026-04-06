@@ -1,0 +1,25 @@
+# Git
+.git
+.gitignore
+
+# Dependencies (rebuilt in Docker)
+node_modules/
+
+# IDE
+.idea
+.vscode
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+README.md
+*.md
+
+# Build output (rebuilt in Docker)
+dist/
