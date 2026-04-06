@@ -169,7 +169,7 @@ export default function TournamentsManagePage() {
 
       {/* Tournament List */}
       <div className="space-y-3">
-        {tournaments.map((tournament) => (
+        {tournaments.map((tournament: Tournament) => (
           <Link
             key={tournament.id}
             to={`/tournaments/${tournament.id}`}

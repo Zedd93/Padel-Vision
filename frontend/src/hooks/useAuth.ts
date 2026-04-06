@@ -41,9 +41,9 @@ export function useAuth() {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const refreshToken = useAuthStore.getState().refreshToken;
-      return refreshToken ? authApi.logout(refreshToken) : Promise.resolve();
+      if (refreshToken) await authApi.logout(refreshToken);
     },
     onSettled: () => {
       storeLogout();
