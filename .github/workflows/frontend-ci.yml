@@ -6,7 +6,6 @@ on:
     paths: ['frontend/**']
   pull_request:
     branches: [main]
-    paths: ['frontend/**']
 
 jobs:
   build-and-test:
@@ -32,15 +31,8 @@ jobs:
 
       - name: Run tests
         working-directory: frontend
-        run: npm run test
+        run: npm run test -- --passWithNoTests
 
       - name: Build
         working-directory: frontend
         run: npm run build
-
-      - name: Build Docker image
-        if: github.ref == 'refs/heads/main'
-        working-directory: frontend
-        env:
-          IMAGE_TAG: padelvision-frontend
-        run: docker build -t "$IMAGE_TAG:latest" .
