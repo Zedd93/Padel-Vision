@@ -702,7 +702,12 @@ export default function VodsManagePage() {
               setExportProgress(data.progress);
               setExportPhase(data.phase);
             }
-          } catch {}
+          } catch(err) {
+              console.error("Export polling failed", err);
+
+              clearInterval(pollInterval);
+              setIsExporting(false);
+          }
         }, 2000);
         intervalsRef.current["export-poll"] = pollInterval;
       }, 3000);

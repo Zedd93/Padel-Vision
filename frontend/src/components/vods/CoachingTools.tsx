@@ -115,15 +115,16 @@ export function CoachingTools({
       ctx.lineJoin = "round";
 
       switch (el.tool) {
-        case "freehand":
+        case "freehand":{
           if (el.points.length < 2) break;
           ctx.beginPath();
           ctx.moveTo(el.points[0].x, el.points[0].y);
           el.points.forEach((p) => ctx.lineTo(p.x, p.y));
           ctx.stroke();
           break;
+        }
 
-        case "arrow":
+        case "arrow": {
           if (el.points.length < 2) break;
           const start = el.points[0];
           const end = el.points[el.points.length - 1];
@@ -147,8 +148,8 @@ export function CoachingTools({
           ctx.closePath();
           ctx.fill();
           break;
-
-        case "circle":
+        }
+        case "circle":{
           if (el.points.length < 2) break;
           const ccx = (el.points[0].x + el.points[el.points.length - 1].x) / 2;
           const ccy = (el.points[0].y + el.points[el.points.length - 1].y) / 2;
@@ -158,13 +159,14 @@ export function CoachingTools({
           ctx.ellipse(ccx, ccy, rx, ry, 0, 0, Math.PI * 2);
           ctx.stroke();
           break;
-
-        case "text":
+        }
+        case "text":{
           if (el.text && el.points.length > 0) {
             ctx.font = "bold 16px 'DM Sans', sans-serif";
             ctx.fillText(el.text, el.points[0].x, el.points[0].y);
           }
           break;
+        }
       }
     });
   }, [drawings]);
@@ -226,14 +228,15 @@ export function CoachingTools({
         ctx.lineJoin = "round";
 
         switch (el.tool) {
-          case "freehand":
+          case "freehand":{
             if (el.points.length < 2) break;
             ctx.beginPath();
             ctx.moveTo(el.points[0].x, el.points[0].y);
             el.points.forEach((p) => ctx.lineTo(p.x, p.y));
             ctx.stroke();
             break;
-          case "arrow":
+          }
+          case "arrow":{
             if (el.points.length < 2) break;
             const s = el.points[0];
             const en = el.points[el.points.length - 1];
@@ -249,7 +252,8 @@ export function CoachingTools({
             ctx.closePath();
             ctx.fill();
             break;
-          case "circle":
+          }
+          case "circle":{
             if (el.points.length < 2) break;
             const cccx = (el.points[0].x + el.points[el.points.length - 1].x) / 2;
             const cccy = (el.points[0].y + el.points[el.points.length - 1].y) / 2;
@@ -259,12 +263,14 @@ export function CoachingTools({
             ctx.ellipse(cccx, cccy, Math.max(1, rrx), Math.max(1, rry), 0, 0, Math.PI * 2);
             ctx.stroke();
             break;
-          case "text":
+          }
+          case "text":{
             if (el.text && el.points.length > 0) {
               ctx.font = "bold 16px 'DM Sans', sans-serif";
               ctx.fillText(el.text, el.points[0].x, el.points[0].y);
             }
             break;
+          }
         }
       });
     },
