@@ -42,3 +42,9 @@ coverage/
 
 # Vite
 *.local
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Vercel
+.vercel
