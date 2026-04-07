@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+*.iml
+.vscode
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+README.md
+*.md
+
+# Tests output
+target/surefire-reports/

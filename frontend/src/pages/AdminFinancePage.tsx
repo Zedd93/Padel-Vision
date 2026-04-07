@@ -25,6 +25,11 @@ import {
   Wallet,
   Receipt,
   BarChart3,
+  FileText,
+  Mail,
+  Printer,
+  X,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { Link } from "react-router-dom";
@@ -169,6 +174,135 @@ type PayoutSort = "club" | "amountNum" | "date" | "status";
 type TxSort = "date" | "amountNum" | "type";
 type SortDir = "asc" | "desc";
 
+/* ─── Invoice ─────────────────────────────────────── */
+
+interface Invoice {
+  id: string;
+  number: string;
+  payoutId: string;
+  club: string;
+  clubAddress: string;
+  clubNip: string;
+  clubEmail: string;
+  amountGross: number;
+  amountNet: number;
+  vatAmount: number;
+  vatRate: number;
+  issuedAt: string;
+  dueAt: string;
+  status: "sent" | "paid";
+  method: string;
+}
+
+const CLUB_BILLING: Record<string, { address: string; nip: string; email: string }> = {
+  "racket-club":  { address: "ul. Sportowa 5, 40-001 Katowice",     nip: "6482345678", email: "kontakt@racketclub.pl" },
+  "padel-krakow": { address: "al. Kijowska 22, 30-079 Kraków",       nip: "6761234567", email: "biuro@padelkrakow.pl" },
+  "smash-arena":  { address: "ul. Wołoska 18, 02-675 Warszawa",      nip: "5213456789", email: "info@smasharena.pl" },
+  "court-masters":{ address: "ul. Gdańska 43, 80-001 Gdańsk",        nip: "5831234567", email: "kontakt@courtmasters.pl" },
+  "viva-padel":   { address: "ul. Roosevelta 3, 60-829 Poznań",      nip: "7781234567", email: "hello@vivapadel.pl" },
+  "padel-wroclaw":{ address: "ul. Legnicka 65, 54-206 Wrocław",      nip: "8991234567", email: "biuro@padelwroclaw.pl" },
+};
+
+const SELLER = {
+  name: "PadelVision sp. z o.o.",
+  address: "ul. Technologiczna 1, 00-001 Warszawa",
+  nip: "5252345678",
+  bank: "PL61 1090 1014 0000 0712 1981 2874",
+};
+
+let _invoiceSeq = 3;
+
+function buildInvoice(payout: PayoutData): Invoice {
+  const billing = CLUB_BILLING[payout.slug] ?? {
+    address: "ul. Nieznana 1, 00-001 Polska",
+    nip: "0000000000",
+    email: "kontakt@klub.pl",
+  };
+  const gross = payout.amountNum;
+  const net = Math.round((gross / 1.23) * 100) / 100;
+  const vat = Math.round((gross - net) * 100) / 100;
+  const now = new Date();
+  const due = new Date(now);
+  due.setDate(due.getDate() + 14);
+  const seq = String(++_invoiceSeq).padStart(3, "0");
+  const num = `FV/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${seq}`;
+  return {
+    id: `inv-${payout.id}-${Date.now()}`,
+    number: num,
+    payoutId: payout.id,
+    club: payout.club,
+    clubAddress: billing.address,
+    clubNip: billing.nip,
+    clubEmail: billing.email,
+    amountGross: gross,
+    amountNet: net,
+    vatAmount: vat,
+    vatRate: 23,
+    issuedAt: now.toISOString().slice(0, 10),
+    dueAt: due.toISOString().slice(0, 10),
+    status: "sent",
+    method: payout.method,
+  };
+}
+
+function buildInvoiceHtml(inv: Invoice): string {
+  return `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8">
+<title>Faktura ${inv.number}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:13px;color:#1a202c;padding:40px;max-width:800px;margin:0 auto}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px}
+  .subtitle{color:#64748b;font-size:12px;margin-bottom:32px}
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:32px}
+  .party-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:6px}
+  .party-name{font-weight:700;font-size:14px;margin-bottom:2px}
+  .party-detail{color:#64748b;font-size:12px;line-height:1.6}
+  table{width:100%;border-collapse:collapse;margin-bottom:24px}
+  th{background:#f8fafc;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #e2e8f0}
+  td{padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:13px}
+  .totals{margin-left:auto;width:260px}
+  .totals tr td:first-child{color:#64748b}
+  .totals tr td:last-child{text-align:right;font-weight:600}
+  .totals .grand td{font-size:16px;font-weight:700;color:#1a202c;border-top:2px solid #e2e8f0;padding-top:10px}
+  .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8}
+  .badge{display:inline-block;background:#dcfce7;color:#16a34a;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700}
+</style></head><body>
+<h1>FAKTURA VAT</h1>
+<p class="subtitle">Nr: <strong>${inv.number}</strong> &nbsp;·&nbsp; Data wystawienia: ${inv.issuedAt} &nbsp;·&nbsp; Termin płatności: ${inv.dueAt}</p>
+<div class="parties">
+  <div><div class="party-label">Sprzedawca</div><div class="party-name">${SELLER.name}</div><div class="party-detail">${SELLER.address}<br>NIP: ${SELLER.nip}<br>Nr konta: ${SELLER.bank}</div></div>
+  <div><div class="party-label">Nabywca</div><div class="party-name">${inv.club}</div><div class="party-detail">${inv.clubAddress}<br>NIP: ${inv.clubNip}<br>${inv.clubEmail}</div></div>
+</div>
+<table>
+  <thead><tr><th>Lp.</th><th>Nazwa usługi</th><th>Netto</th><th>VAT</th><th>Brutto</th></tr></thead>
+  <tbody><tr><td>1</td><td>Wypłata przychodów z platformy PadelVision<br><small style="color:#94a3b8">Metoda: ${inv.method}</small></td><td>${inv.amountNet.toFixed(2)} zł</td><td>${inv.vatRate}%</td><td>${inv.amountGross.toFixed(2)} zł</td></tr></tbody>
+</table>
+<table class="totals">
+  <tr><td>Netto:</td><td>${inv.amountNet.toFixed(2)} zł</td></tr>
+  <tr><td>VAT (${inv.vatRate}%):</td><td>${inv.vatAmount.toFixed(2)} zł</td></tr>
+  <tr class="grand"><td>Do zapłaty:</td><td>${inv.amountGross.toFixed(2)} zł</td></tr>
+</table>
+<div class="footer"><span>Wygenerowano automatycznie przez PadelVision · ${new Date().toLocaleString("pl-PL")}</span><span class="badge">WYSŁANA</span></div>
+</body></html>`;
+}
+
+const INITIAL_INVOICES: Invoice[] = [
+  {
+    id: "inv-p5-0", number: "FV/2026/03/001", payoutId: "p5",
+    club: "Viva Padel Poznań", clubAddress: "ul. Roosevelta 3, 60-829 Poznań",
+    clubNip: "7781234567", clubEmail: "hello@vivapadel.pl",
+    amountGross: 420, amountNet: 341.46, vatAmount: 78.54, vatRate: 23,
+    issuedAt: "2026-03-25", dueAt: "2026-04-08", status: "paid", method: "Stripe Connect",
+  },
+  {
+    id: "inv-p6-0", number: "FV/2026/03/002", payoutId: "p6",
+    club: "Padel Wrocław", clubAddress: "ul. Legnicka 65, 54-206 Wrocław",
+    clubNip: "8991234567", clubEmail: "biuro@padelwroclaw.pl",
+    amountGross: 310, amountNet: 252.03, vatAmount: 57.97, vatRate: 23,
+    issuedAt: "2026-03-20", dueAt: "2026-04-03", status: "paid", method: "Przelew",
+  },
+];
+
 /* ─── Component ──────────────────────────────────────── */
 
 export default function AdminFinancePage() {
@@ -187,6 +321,9 @@ export default function AdminFinancePage() {
   const [showTxDetail, setShowTxDetail] = useState<string | null>(null);
   const [showRevenueDetail, setShowRevenueDetail] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [copiedInvoice, setCopiedInvoice] = useState<string | null>(null);
 
   // Auto-hide toast
   useEffect(() => {
@@ -222,22 +359,46 @@ export default function AdminFinancePage() {
     .reduce((s, p) => s + p.amountNum, 0);
 
   const handlePayoutAction = (id: string, action: "approve" | "reject") => {
+    const payout = payouts.find((p) => p.id === id);
     setPayouts((prev) =>
       prev.map((p) =>
         p.id === id ? { ...p, status: action === "approve" ? "approved" : "rejected" } : p
       )
     );
-    const payout = payouts.find((p) => p.id === id);
-    showToast(action === "approve" ? `Zatwierdzono wypłatę ${payout?.amount} dla ${payout?.club}` : `Odrzucono wypłatę dla ${payout?.club}`);
+    if (action === "approve" && payout) {
+      const inv = buildInvoice(payout);
+      setInvoices((prev) => [inv, ...prev]);
+      showToast(`Zatwierdzono wypłatę · Faktura ${inv.number} wysłana na ${CLUB_BILLING[payout.slug]?.email ?? "email klubu"}`);
+    } else {
+      showToast(`Odrzucono wypłatę dla ${payout?.club}`);
+    }
     setShowPayoutConfirm(null);
   };
 
   const handleApproveAll = () => {
-    const pendingCount = payouts.filter((p) => p.status === "pending").length;
+    const pending = payouts.filter((p) => p.status === "pending");
     setPayouts((prev) =>
       prev.map((p) => (p.status === "pending" ? { ...p, status: "approved" } : p))
     );
-    showToast(`Zatwierdzono ${pendingCount} wypłat`);
+    const newInvoices = pending.map(buildInvoice);
+    setInvoices((prev) => [...newInvoices, ...prev]);
+    showToast(`Zatwierdzono ${pending.length} wypłat · Wystawiono ${pending.length} faktur`);
+  };
+
+  const handlePrintInvoice = (inv: Invoice) => {
+    const html = buildInvoiceHtml(inv);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (win) {
+      win.onload = () => { win.print(); setTimeout(() => URL.revokeObjectURL(url), 5000); };
+    }
+  };
+
+  const handleCopyInvoiceNumber = (num: string) => {
+    navigator.clipboard.writeText(num);
+    setCopiedInvoice(num);
+    setTimeout(() => setCopiedInvoice(null), 2000);
   };
 
   /* ─── Transactions ───────────────────────────── */
@@ -680,6 +841,195 @@ export default function AdminFinancePage() {
         </div>
       </div>
 
+      {/* ─── Invoices Section ───────────────────── */}
+      <div className="mt-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-display text-lg">Faktury</h2>
+            <p className="text-xs text-muted">Automatycznie wystawiane przy zatwierdzeniu wypłaty</p>
+          </div>
+          <span className="rounded-full bg-bg4 px-3 py-1 text-xs text-muted">
+            {invoices.length} faktur
+          </span>
+        </div>
+
+        {invoices.length === 0 ? (
+          <div className="glass-card flex flex-col items-center gap-3 p-10 text-center">
+            <FileText className="h-10 w-10 text-muted" />
+            <p className="text-sm text-muted">Brak faktur — pojawią się tu po zatwierdzeniu pierwszej wypłaty.</p>
+          </div>
+        ) : (
+          <div className="glass-card overflow-hidden">
+            <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-x-4 border-b border-border px-4 py-2 text-[10px] font-bold uppercase text-muted">
+              <span>Nr faktury</span>
+              <span>Klub</span>
+              <span className="text-right">Brutto</span>
+              <span className="text-right">Data</span>
+              <span>Status</span>
+              <span />
+            </div>
+            {invoices.map((inv) => (
+              <div
+                key={inv.id}
+                className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] items-center gap-x-4 border-b border-border px-4 py-3 last:border-0 hover:bg-bg3/40 transition-colors"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <FileText className="h-3.5 w-3.5 flex-shrink-0 text-lime" />
+                  <span className="truncate font-mono text-xs text-text">{inv.number}</span>
+                  <button
+                    onClick={() => handleCopyInvoiceNumber(inv.number)}
+                    className="flex-shrink-0 text-muted hover:text-text"
+                    title="Kopiuj numer"
+                  >
+                    {copiedInvoice === inv.number
+                      ? <CheckCircle2 className="h-3 w-3 text-lime" />
+                      : <Copy className="h-3 w-3" />}
+                  </button>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-text">{inv.club}</p>
+                  <p className="truncate text-[10px] text-muted">{inv.clubEmail}</p>
+                </div>
+                <span className="font-mono text-xs font-semibold text-orange">
+                  {inv.amountGross.toLocaleString("pl-PL")} zł
+                </span>
+                <span className="text-[11px] text-muted">{inv.issuedAt}</span>
+                <span className={cn(
+                  "rounded-full px-2 py-0.5 text-[9px] font-bold",
+                  inv.status === "paid"
+                    ? "bg-blue-500/20 text-blue-400"
+                    : "bg-emerald-500/20 text-emerald-400"
+                )}>
+                  {inv.status === "paid" ? "Opłacona" : "Wysłana"}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPreviewInvoice(inv)}
+                    className="rounded p-1.5 text-muted hover:bg-bg4 hover:text-text"
+                    title="Podgląd"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handlePrintInvoice(inv)}
+                    className="rounded p-1.5 text-muted hover:bg-bg4 hover:text-text"
+                    title="Drukuj / Pobierz PDF"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ─── Invoice Preview Modal ───────────────── */}
+      {previewInvoice && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewInvoice(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-[#0B0C10] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-lime" />
+                <div>
+                  <h3 className="text-display text-base">Faktura {previewInvoice.number}</h3>
+                  <p className="text-[11px] text-muted">Wystawiona: {previewInvoice.issuedAt}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePrintInvoice(previewInvoice)}
+                  className="flex items-center gap-1.5 rounded-lg bg-bg3 px-3 py-1.5 text-xs text-muted hover:bg-bg4 hover:text-text"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Drukuj
+                </button>
+                <button onClick={() => setPreviewInvoice(null)} className="text-muted hover:text-text">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-bg3 p-4">
+                  <p className="mb-2 text-[10px] font-bold uppercase text-muted">Sprzedawca</p>
+                  <p className="text-sm font-semibold text-text">{SELLER.name}</p>
+                  <p className="mt-1 text-xs text-muted leading-relaxed">
+                    {SELLER.address}<br />
+                    NIP: {SELLER.nip}<br />
+                    <span className="font-mono text-[10px]">{SELLER.bank}</span>
+                  </p>
+                </div>
+                <div className="rounded-lg bg-bg3 p-4">
+                  <p className="mb-2 text-[10px] font-bold uppercase text-muted">Nabywca</p>
+                  <p className="text-sm font-semibold text-text">{previewInvoice.club}</p>
+                  <p className="mt-1 text-xs text-muted leading-relaxed">
+                    {previewInvoice.clubAddress}<br />
+                    NIP: {previewInvoice.clubNip}<br />
+                    <span className="text-lime">{previewInvoice.clubEmail}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 bg-bg3 px-4 py-2 text-[10px] font-bold uppercase text-muted">
+                  <span>Usługa</span>
+                  <span className="text-right">Netto</span>
+                  <span className="text-right">VAT</span>
+                  <span className="text-right">Brutto</span>
+                </div>
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 text-sm">
+                  <div>
+                    <p className="font-medium text-text">Wypłata przychodów z platformy PadelVision</p>
+                    <p className="text-[11px] text-muted">Metoda: {previewInvoice.method}</p>
+                  </div>
+                  <span className="font-mono text-text">{previewInvoice.amountNet.toFixed(2)} zł</span>
+                  <span className="font-mono text-muted">{previewInvoice.vatRate}%</span>
+                  <span className="font-mono font-semibold text-lime">{previewInvoice.amountGross.toFixed(2)} zł</span>
+                </div>
+              </div>
+              <div className="ml-auto w-56 space-y-1.5 rounded-lg bg-bg3 p-4">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted">Netto</span>
+                  <span className="font-mono text-text">{previewInvoice.amountNet.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted">VAT ({previewInvoice.vatRate}%)</span>
+                  <span className="font-mono text-text">{previewInvoice.vatAmount.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-2 text-sm font-bold">
+                  <span className="text-text">Do zapłaty</span>
+                  <span className="font-mono text-lime">{previewInvoice.amountGross.toFixed(2)} zł</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
+                <Mail className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+                <p className="text-xs text-emerald-400">
+                  Faktura została automatycznie wysłana na adres{" "}
+                  <span className="font-semibold">{previewInvoice.clubEmail}</span>{" "}
+                  w dniu {previewInvoice.issuedAt}.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-bg3 p-3">
+                  <p className="text-[10px] text-muted">Data wystawienia</p>
+                  <p className="text-sm font-medium text-text">{previewInvoice.issuedAt}</p>
+                </div>
+                <div className="rounded-lg bg-bg3 p-3">
+                  <p className="text-[10px] text-muted">Termin płatności</p>
+                  <p className="text-sm font-medium text-text">{previewInvoice.dueAt}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Payout Confirm Modal ───────────────── */}
       {showPayoutConfirm && (() => {
         const payout = payouts.find((p) => p.id === showPayoutConfirm.id);
@@ -728,6 +1078,14 @@ export default function AdminFinancePage() {
                   </div>
                 </div>
               </div>
+              {isApprove && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5">
+                  <Mail className="h-4 w-4 flex-shrink-0 text-emerald-400 mt-0.5" />
+                  <p className="text-xs text-emerald-400">
+                    Faktura VAT zostanie automatycznie wystawiona i wysłana na adres email klubu.
+                  </p>
+                </div>
+              )}
               <p className="mt-3 text-sm text-muted">
                 {isApprove
                   ? "Wypłata zostanie przetworzona przez Stripe Connect. Środki trafią na konto klubu w ciągu 2-3 dni roboczych."

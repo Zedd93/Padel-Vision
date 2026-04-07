@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, Trophy, Calendar, Users, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/utils/cn";
-import { useTournamentStore, Tournament } from "@/lib/stores/tournament-store";
+import { useTournamentStore, Tournament, CreateTournamentInput } from "@/lib/stores/tournament-store";
 
 export default function TournamentsManagePage() {
   const { tournaments, addTournament } = useTournamentStore();
@@ -18,34 +18,42 @@ export default function TournamentsManagePage() {
     prizes: "",
   });
 
-  const handleCreate = () => {
-    if (!formData.name || !formData.date) return;
-    const newTournament: Tournament = {
-      id: String(Date.now()),
-      name: formData.name,
-      format: formData.format,
-      category: formData.category,
-      level: formData.level,
-      date: formData.date,
-      maxPairs: parseInt(formData.maxPairs) || 16,
-      registeredPairs: 0,
-      entryFee: formData.entryFee ? parseInt(formData.entryFee) : undefined,
-      prizes: formData.prizes || undefined,
-      status: "upcoming",
-      pairs: [],
-      matches: [],
-    };
-    addTournament(newTournament);
-    setFormData({ name: "", date: "", format: "ELIMINATION", category: "OPEN", level: "A", maxPairs: "", entryFee: "", prizes: "" });
-    setShowForm(false);
+  
+const handleCreate = () => {
+  if (!formData.name || !formData.date) return;
 
-    // Fire-and-forget API persistence
-    fetch("/api/tournaments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newTournament),
-    }).catch(() => {});
+  const input: CreateTournamentInput = {
+    name: formData.name,
+    format: formData.format,
+    category: formData.category,
+    level: formData.level,
+    date: formData.date,
+    maxPairs: parseInt(formData.maxPairs) || 16,
+    entryFee: formData.entryFee ? parseInt(formData.entryFee) : 0,
+    prizes: formData.prizes || undefined,
   };
+
+  addTournament(input);
+
+  setFormData({
+    name: "",
+    date: "",
+    format: "ELIMINATION",
+    category: "OPEN",
+    level: "A",
+    maxPairs: "",
+    entryFee: "",
+    prizes: "",
+  });
+
+  setShowForm(false);
+
+  fetch("/api/tournaments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).catch(() => {});
+};
 
   return (
     <div className="p-6">
@@ -169,7 +177,7 @@ export default function TournamentsManagePage() {
 
       {/* Tournament List */}
       <div className="space-y-3">
-        {tournaments.map((tournament) => (
+        {tournaments.map((tournament: Tournament) => (
           <Link
             key={tournament.id}
             to={`/tournaments/${tournament.id}`}
@@ -179,9 +187,9 @@ export default function TournamentsManagePage() {
               <div
                 className={cn(
                   "flex h-10 w-10 items-center justify-center rounded-lg",
-                  tournament.status === "live"
+                  tournament.status === "in_progress"
                     ? "bg-live/20 text-live"
-                    : tournament.status === "upcoming"
+                    : tournament.status === "registration"
                     ? "bg-lime/10 text-lime"
                     : "bg-bg4 text-muted"
                 )}
@@ -191,7 +199,7 @@ export default function TournamentsManagePage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-text">{tournament.name}</h3>
-                  {tournament.status === "live" && (
+                  {tournament.status === "in_progress" && (
                     <span className="badge-live text-[9px]">LIVE</span>
                   )}
                 </div>
@@ -203,7 +211,7 @@ export default function TournamentsManagePage() {
                   <span>{tournament.category} {tournament.level}</span>
                   <span className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {tournament.registeredPairs}/{tournament.maxPairs} par
+                    {tournament.pairs.length}/{tournament.maxPairs} par
                   </span>
                   <span className="capitalize">{tournament.format.toLowerCase().replace("_", " ")}</span>
                 </div>

@@ -619,7 +619,9 @@ function IntegrationsTab() {
       try {
         const saved = localStorage.getItem(SOCIAL_STORAGE_KEY);
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch(err) {
+          console.warn("Failed to load social integrations from localStorage", err);
+      }
     }
     return {
       facebook: { connected: false, accountName: "", enabled: true },
@@ -633,8 +635,9 @@ function IntegrationsTab() {
     localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(socialPlatforms));
   }, [socialPlatforms]);
 
-  useEffect(() => { playtomic.fetchStatus(CLUB_ID); }, []);
-
+useEffect(() => {
+  playtomic.sync(CLUB_ID);
+}, []);
   const toggleSocialConnect = (platform: string) => {
     setSocialPlatforms((prev) => {
       const current = prev[platform];

@@ -19,7 +19,13 @@
 - [Skalowanie](#skalowanie)
 - [Koszty — 3 scenariusze](#koszty--3-scenariusze)
 - [Disaster Recovery i SLA](#disaster-recovery-i-sla)
+- [Flowcharty Backend](#flowcharty-backend)
 - [Dokumentacja API](#dokumentacja-api)
+
+> **Diagramy Mermaid** — ten README zawiera interaktywne diagramy w formacie [Mermaid](https://mermaid.js.org/). Na **GitHub** renderuja sie automatycznie. Lokalnie zainstaluj plugin:
+> - **VS Code**: [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid)
+> - **IntelliJ / WebStorm**: wbudowana obsluga w podgladzie Markdown (Settings → Languages → Markdown → Mermaid)
+> - **CLI**: `npm install -g @mermaid-js/mermaid-cli` → `mmdc -i README.md -o diagram.svg`
 
 ---
 
@@ -93,54 +99,34 @@ flowchart TB
         OBS["OBS Studio / Kamera"]
     end
 
-    subgraph AWS_EDGE["AWS Edge"]
-        R53["Route 53<br/>DNS"]
-        CF["CloudFront<br/>CDN"]
-        WAF["AWS WAF<br/>Firewall"]
+    subgraph EDGE["AWS Edge"]
+        R53["Route 53 DNS"]
+        CF["CloudFront CDN"]
+        WAF["AWS WAF"]
     end
 
-    subgraph AWS_NETWORKING["VPC — eu-central-1"]
-        subgraph PUBLIC_SUBNET["Public Subnets (2 AZ)"]
-            ALB["Application<br/>Load Balancer"]
-            NAT["NAT Gateway"]
-        end
-
-        subgraph PRIVATE_SUBNET["Private Subnets (2 AZ)"]
-            subgraph EKS["Amazon EKS Cluster"]
-                subgraph BACKEND_PODS["Backend Pods (2-20)"]
-                    API1["API Pod 1<br/>Spring Boot"]
-                    API2["API Pod 2<br/>Spring Boot"]
-                    APIN["API Pod N<br/>Spring Boot"]
-                end
-                subgraph FRONTEND_PODS["Frontend Pods (2-10)"]
-                    FE1["Frontend Pod 1<br/>Nginx + React"]
-                    FE2["Frontend Pod 2<br/>Nginx + React"]
-                end
-                PGBOUNCER["PgBouncer<br/>Sidecar"]
-            end
-
-            subgraph DATA["Data Layer"]
-                RDS["RDS PostgreSQL 16<br/>Multi-AZ"]
-                REDIS["ElastiCache Redis<br/>Cluster"]
-            end
-        end
+    subgraph VPC["VPC eu-central-1"]
+        ALB["Application Load Balancer"]
+        API["Backend Pods 2-20 Spring Boot"]
+        FE["Frontend Pods 2-10 Nginx React"]
+        PGBOUNCER["PgBouncer Sidecar"]
+        RDS["RDS PostgreSQL 16 Multi-AZ"]
+        REDIS["ElastiCache Redis"]
     end
 
-    subgraph AWS_STORAGE["Storage"]
-        S3["S3 Bucket<br/>Media + Static"]
-        S3_GLACIER["S3 Glacier<br/>Archiwum"]
+    subgraph STORAGE["Storage"]
+        S3["S3 Media + Static"]
+        S3_GLACIER["S3 Glacier Archiwum"]
     end
 
-    subgraph AWS_STREAMING["Streaming"]
-        IVS["Amazon IVS<br/>Low-Latency"]
+    IVS["Amazon IVS Low-Latency"]
+
+    subgraph MONITORING["Monitoring"]
+        CW["CloudWatch"]
+        XRAY["X-Ray Tracing"]
     end
 
-    subgraph AWS_MONITORING["Monitoring"]
-        CW["CloudWatch<br/>Logs + Metrics"]
-        XRAY["X-Ray<br/>Tracing"]
-    end
-
-    subgraph CI_CD["CI/CD"]
+    subgraph CICD["CI/CD"]
         GH["GitHub Actions"]
         ECR["Amazon ECR"]
     end
@@ -150,20 +136,20 @@ flowchart TB
     R53 --> CF
     CF --> WAF
     WAF --> ALB
-    CF -->|"Static assets"| S3
-    ALB --> BACKEND_PODS
-    ALB --> FRONTEND_PODS
-    BACKEND_PODS --> PGBOUNCER --> RDS
-    BACKEND_PODS --> REDIS
-    BACKEND_PODS --> S3
-    BACKEND_PODS --> IVS
-    OBS -->|"RTMP ingest"| IVS
-    IVS -->|"HLS playback"| CF
-    S3 -->|"Lifecycle rule"| S3_GLACIER
-    BACKEND_PODS --> CW
-    BACKEND_PODS --> XRAY
-    GH -->|"Push image"| ECR
-    GH -->|"Deploy"| EKS
+    CF -- Static assets --> S3
+    ALB --> API
+    ALB --> FE
+    API --> PGBOUNCER --> RDS
+    API --> REDIS
+    API --> S3
+    API --> IVS
+    OBS -- RTMP ingest --> IVS
+    IVS -- HLS playback --> CF
+    S3 -- Lifecycle rule --> S3_GLACIER
+    API --> CW
+    API --> XRAY
+    GH -- Push image --> ECR
+    GH -- Deploy --> VPC
 ```
 
 ### Przeplyw danych — rezerwacja kortu
@@ -473,7 +459,7 @@ flowchart TD
     A[Incident Detected] --> B{Automatic Recovery?}
     B -->|Yes| C[Multi-AZ Failover]
     C --> D[Health Checks Verify]
-    D --> E[Service Restored < 5min]
+    D --> E[Service Restored pod 5 min]
 
     B -->|No — Major Failure| F[Page On-Call Engineer]
     F --> G[Assess Damage]
@@ -482,7 +468,7 @@ flowchart TD
     H -->|Yes| J[RDS Point-in-Time Recovery]
     J --> K[Restore to Latest Backup]
     K --> L[Verify Data Integrity]
-    I --> M[Service Restored < 30min]
+    I --> M[Service Restored pod 30 min]
     L --> M
 ```
 

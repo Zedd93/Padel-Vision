@@ -3,6 +3,7 @@ services:
     extends:
       file: docker-compose.microservices.yml
       service: postgres
+    container_name: pv-postgres-test
     environment:
       POSTGRES_DB: padelvision_test
     deploy:
@@ -19,11 +20,14 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      - padelvision-network
 
   redis:
     extends:
       file: docker-compose.microservices.yml
       service: redis
+    container_name: pv-redis-test
     deploy:
       resources:
         limits:
@@ -38,6 +42,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      - padelvision-network
 
   backend:
     build:

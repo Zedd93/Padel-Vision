@@ -16,10 +16,18 @@ target/
 *.swp
 *.swo
 
-# Environment
+# Environment / Secrets — NEVER commit real secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+scripts/secrets-dev.json
+scripts/secrets-prod.json
 
 # OS
 .DS_Store

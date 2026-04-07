@@ -1,0 +1,45 @@
+name: "Deploy App"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ─── Frontend Pipeline ─────────────────────────────
+  frontend-lint:
+    uses: ./.github/workflows/frontend-lint.yml
+
+  frontend-test:
+    needs: frontend-lint
+    uses: ./.github/workflows/frontend-test.yml
+
+  frontend-build:
+    needs: frontend-test
+    uses: ./.github/workflows/frontend-build.yml
+
+  # ─── Backend Pipeline (parallel with frontend) ─────
+  backend-test:
+    uses: ./.github/workflows/backend-test.yml
+
+  backend-build:
+    needs: backend-test
+    uses: ./.github/workflows/backend-build.yml
+
+  # ─── Docker Publish (after both pipelines pass) ────
+  docker-publish:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [frontend-build, backend-build]
+    uses: ./.github/workflows/docker-publish.yml
+    permissions:
+      contents: read
+      packages: write
+
+  # ─── Deploy (after images published) ───────────────
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: docker-publish
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

@@ -1,15 +1,10 @@
-name: Backend CI
+name: "Backend: Test"
 
 on:
-  push:
-    branches: [main]
-    paths: ['backend/**']
-  pull_request:
-    branches: [main]
-    paths: ['backend/**']
+  workflow_call:
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
 
     services:
@@ -40,8 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -56,15 +50,4 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           JWT_SECRET: ci-test-secret-min-256-bit-key-for-hs512-algorithm
-        run: ./mvnw clean verify -B
-
-      - name: Build package
-        working-directory: backend
-        run: ./mvnw package -DskipTests -B
-
-      - name: Build Docker image
-        if: github.ref == 'refs/heads/main'
-        working-directory: backend
-        env:
-          IMAGE_TAG: padelvision-backend
-        run: docker build -t "$IMAGE_TAG:latest" .
+        run: mvn clean verify -B

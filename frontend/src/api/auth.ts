@@ -116,7 +116,7 @@ export const authApi = {
   logout: (_refreshToken: string) =>
     withFallback(
       () => apiClient.post('/api/auth/logout', { refreshToken: _refreshToken }),
-      () => ({ data: { success: true } }),
+      () => ({ data: { success: true }, status: 200, statusText: 'OK', headers: {}, config: {} }) as any,
     ),
 
   getMe: () =>

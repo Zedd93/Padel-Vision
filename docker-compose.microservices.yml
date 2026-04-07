@@ -1,0 +1,100 @@
+services:
+  # ─── PostgreSQL ───────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: pv-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-padelvision}
+      POSTGRES_USER: ${POSTGRES_USER:-padelvision}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-padelvision}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - padelvision-network
+
+  # ─── Redis ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: pv-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - padelvision-network
+
+  # ─── Backend (Spring Boot) ───────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pv-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-padelvision}
+      DATABASE_USERNAME: ${POSTGRES_USER:-padelvision}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-changeme}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-min-256-bit-key-for-hs512-padelvision-app}
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    networks:
+      - padelvision-network
+
+  # ─── Frontend (React + nginx) ────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pv-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - padelvision-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  padelvision-network:
+    driver: bridge
