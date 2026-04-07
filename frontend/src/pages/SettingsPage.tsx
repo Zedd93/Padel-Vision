@@ -635,8 +635,9 @@ function IntegrationsTab() {
     localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(socialPlatforms));
   }, [socialPlatforms]);
 
-  useEffect(() => { playtomic.fetchStatus(CLUB_ID); }, []);
-
+useEffect(() => {
+  playtomic.sync(CLUB_ID);
+}, []);
   const toggleSocialConnect = (platform: string) => {
     setSocialPlatforms((prev) => {
       const current = prev[platform];

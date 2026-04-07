@@ -21,6 +21,23 @@ export interface TournamentMatch {
   court?: string;
 }
 
+export type CreateTournamentInput = {
+  name: string;
+  format: string;
+  category: string;
+  level: string;
+  date: string;
+  maxPairs: number;
+  entryFee: number;
+  prizes?: string;
+};
+
+export type TournamentStatus =
+  | "draft"
+  | "registration"
+  | "in_progress"
+  | "completed";
+
 export interface Tournament {
   id: string;
   name: string;
@@ -30,8 +47,8 @@ export interface Tournament {
   level: string;
   maxPairs: number;
   entryFee: number;
-  prizes: string;
-  status: "draft" | "registration" | "in_progress" | "completed";
+  prizes?: string;
+  status: TournamentStatus;
   pairs: TournamentPair[];
   matches: TournamentMatch[];
   drawCertificate?: string;
@@ -41,61 +58,28 @@ export interface Tournament {
 interface TournamentStore {
   tournaments: Tournament[];
   getTournament: (id: string) => Tournament | undefined;
-  addTournament: (t: Omit<Tournament, "id" | "pairs" | "matches" | "createdAt" | "status">) => void;
+
+  addTournament: (
+    t: Omit<Tournament, "id" | "pairs" | "matches" | "createdAt" | "status">
+  ) => void;
+
   updateTournament: (id: string, data: Partial<Tournament>) => void;
   removeTournament: (id: string) => void;
+
   addPair: (tournamentId: string, pair: Omit<TournamentPair, "id">) => void;
   removePair: (tournamentId: string, pairId: string) => void;
   updatePair: (tournamentId: string, pairId: string, data: Partial<TournamentPair>) => void;
+
   updateMatch: (tournamentId: string, matchId: string, data: Partial<TournamentMatch>) => void;
 }
 
 export const useTournamentStore = create<TournamentStore>()(
   persist(
     (set, get) => ({
-      tournaments: [
-        {
-          id: "silesia-open-2026",
-          name: "SILESIA OPEN 2026",
-          date: "2026-04-15",
-          format: "ELIMINATION",
-          category: "OPEN",
-          level: "A",
-          maxPairs: 16,
-          entryFee: 150,
-          prizes: "5 000 zł",
-          status: "registration",
-          pairs: [
-            { id: "p1", player1: "Jan Kowalski", player2: "Adam Nowak", seed: 1, status: "confirmed" },
-            { id: "p2", player1: "Piotr Wiśniewski", player2: "Marek Zieliński", seed: 2, status: "confirmed" },
-            { id: "p3", player1: "Tomasz Lewandowski", player2: "Michał Wójcik", status: "confirmed" },
-            { id: "p4", player1: "Krzysztof Kamiński", player2: "Paweł Szymański", status: "confirmed" },
-            { id: "p5", player1: "Jakub Dąbrowski", player2: "Mateusz Kozłowski", status: "pending" },
-          ],
-          matches: [],
-          createdAt: "2026-03-01T10:00:00Z",
-        },
-        {
-          id: "krakow-masters-2026",
-          name: "KRAKÓW MASTERS 2026",
-          date: "2026-05-10",
-          format: "ELIMINATION",
-          category: "OPEN",
-          level: "B",
-          maxPairs: 8,
-          entryFee: 100,
-          prizes: "2 000 zł",
-          status: "draft",
-          pairs: [
-            { id: "p1", player1: "Anna Maj", player2: "Ewa Krawczyk", seed: 1, status: "confirmed" },
-            { id: "p2", player1: "Monika Piotrowska", player2: "Katarzyna Grabowska", status: "confirmed" },
-          ],
-          matches: [],
-          createdAt: "2026-03-15T14:00:00Z",
-        },
-      ],
+      tournaments: [],
 
-      getTournament: (id) => get().tournaments.find((t) => t.id === id),
+      getTournament: (id) =>
+        get().tournaments.find((t) => t.id === id),
 
       addTournament: (data) =>
         set((state) => ({
@@ -106,7 +90,7 @@ export const useTournamentStore = create<TournamentStore>()(
               id: `tournament-${Date.now()}`,
               pairs: [],
               matches: [],
-              status: "draft",
+              status: "registration",
               createdAt: new Date().toISOString(),
             },
           ],
@@ -128,7 +112,13 @@ export const useTournamentStore = create<TournamentStore>()(
         set((state) => ({
           tournaments: state.tournaments.map((t) =>
             t.id === tournamentId
-              ? { ...t, pairs: [...t.pairs, { ...pair, id: `pair-${Date.now()}` }] }
+              ? {
+                  ...t,
+                  pairs: [
+                    ...t.pairs,
+                    { ...pair, id: `pair-${Date.now()}` },
+                  ],
+                }
               : t
           ),
         })),
@@ -137,7 +127,10 @@ export const useTournamentStore = create<TournamentStore>()(
         set((state) => ({
           tournaments: state.tournaments.map((t) =>
             t.id === tournamentId
-              ? { ...t, pairs: t.pairs.filter((p) => p.id !== pairId) }
+              ? {
+                  ...t,
+                  pairs: t.pairs.filter((p) => p.id !== pairId),
+                }
               : t
           ),
         })),
@@ -146,7 +139,12 @@ export const useTournamentStore = create<TournamentStore>()(
         set((state) => ({
           tournaments: state.tournaments.map((t) =>
             t.id === tournamentId
-              ? { ...t, pairs: t.pairs.map((p) => (p.id === pairId ? { ...p, ...data } : p)) }
+              ? {
+                  ...t,
+                  pairs: t.pairs.map((p) =>
+                    p.id === pairId ? { ...p, ...data } : p
+                  ),
+                }
               : t
           ),
         })),
@@ -155,7 +153,12 @@ export const useTournamentStore = create<TournamentStore>()(
         set((state) => ({
           tournaments: state.tournaments.map((t) =>
             t.id === tournamentId
-              ? { ...t, matches: t.matches.map((m) => (m.id === matchId ? { ...m, ...data } : m)) }
+              ? {
+                  ...t,
+                  matches: t.matches.map((m) =>
+                    m.id === matchId ? { ...m, ...data } : m
+                  ),
+                }
               : t
           ),
         })),

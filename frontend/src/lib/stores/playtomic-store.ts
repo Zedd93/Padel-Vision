@@ -11,7 +11,13 @@ interface PlaytomicStatus {
 interface PlaytomicStore {
   status: PlaytomicStatus;
   isLoading: boolean;
-  connect: (clubId: string, credentials: { clientId: string; clientSecret: string; tenantId: string }) => Promise<boolean>;
+  error: string | null;
+
+  connect: (
+    clubId: string,
+    credentials: { clientId: string; clientSecret: string; tenantId: string }
+  ) => Promise<boolean>;
+
   disconnect: (clubId: string) => Promise<void>;
   sync: (clubId: string) => Promise<void>;
 }
@@ -25,47 +31,84 @@ export const usePlaytomicStore = create<PlaytomicStore>()(
         clubName: null,
         lastSyncAt: null,
       },
+
       isLoading: false,
+      error: null,
 
       connect: async (_clubId, credentials) => {
-        set({ isLoading: true });
-        // Mock API call
-        await new Promise((r) => setTimeout(r, 1500));
-        set({
-          status: {
-            connected: true,
-            tenantId: credentials.tenantId,
-            clubName: "Playtomic Club",
-            lastSyncAt: new Date().toISOString(),
-          },
-          isLoading: false,
-        });
-        return true;
+        try {
+          set({ isLoading: true, error: null });
+
+          // Mock API call
+          await new Promise((r) => setTimeout(r, 1500));
+
+          set({
+            status: {
+              connected: true,
+              tenantId: credentials.tenantId,
+              clubName: "Playtomic Club",
+              lastSyncAt: new Date().toISOString(),
+            },
+            isLoading: false,
+          });
+
+          return true;
+        } catch (err) {
+          set({
+            isLoading: false,
+            error: "Failed to connect to Playtomic",
+          });
+
+          return false;
+        }
       },
 
       disconnect: async (_clubId) => {
-        set({ isLoading: true });
-        await new Promise((r) => setTimeout(r, 800));
-        set({
-          status: {
-            connected: false,
-            tenantId: null,
-            clubName: null,
-            lastSyncAt: null,
-          },
-          isLoading: false,
-        });
+        try {
+          set({ isLoading: true, error: null });
+
+          await new Promise((r) => setTimeout(r, 800));
+
+          set({
+            status: {
+              connected: false,
+              tenantId: null,
+              clubName: null,
+              lastSyncAt: null,
+            },
+            isLoading: false,
+          });
+        } catch (err) {
+          set({
+            isLoading: false,
+            error: "Failed to disconnect",
+          });
+        }
       },
 
       sync: async (_clubId) => {
-        set({ isLoading: true });
-        await new Promise((r) => setTimeout(r, 2000));
-        set((state) => ({
-          status: { ...state.status, lastSyncAt: new Date().toISOString() },
-          isLoading: false,
-        }));
+        try {
+          set({ isLoading: true, error: null });
+
+          await new Promise((r) => setTimeout(r, 2000));
+
+          set((state) => ({
+            status: {
+              ...state.status,
+              lastSyncAt: new Date().toISOString(),
+            },
+            isLoading: false,
+          }));
+        } catch (err) {
+          set({
+            isLoading: false,
+            error: "Sync failed",
+          });
+        }
       },
     }),
-    { name: "padelvision-playtomic" }
+    {
+      name: "padelvision-playtomic",
+    }
   )
 );
