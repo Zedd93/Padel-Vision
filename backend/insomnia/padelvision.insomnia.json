@@ -1,0 +1,535 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-04-07T12:00:00.000Z",
+  "__export_source": "padelvision.backend:v1",
+  "resources": [
+    {
+      "_id": "wrk_padelvision",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "PadelVision API",
+      "description": "Backend REST API collection for PadelVision. Use Inso CLI to run tests in CI: `inso run test smoke --src backend/insomnia`",
+      "scope": "collection"
+    },
+
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_padelvision",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:8080",
+        "access_token": "",
+        "refresh_token": "",
+        "user_id": "",
+        "test_email": "insomnia.smoke+{% now 'unix' %}@padelvision.tv",
+        "test_password": "InsomniaTest123!",
+        "test_username": "insomnia_smoke_{% now 'unix' %}",
+        "test_name": "Insomnia Smoke User"
+      },
+      "dataPropertyOrder": {
+        "&": ["base_url", "access_token", "refresh_token", "user_id", "test_email", "test_password", "test_username", "test_name"]
+      },
+      "color": null,
+      "isPrivate": false
+    },
+    {
+      "_id": "env_local",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "Local",
+      "data": { "base_url": "http://localhost:8080" },
+      "color": "#22c55e",
+      "isPrivate": false
+    },
+    {
+      "_id": "env_ci",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "CI",
+      "data": { "base_url": "http://localhost:8080" },
+      "color": "#3b82f6",
+      "isPrivate": false
+    },
+
+    { "_id": "fld_health", "_type": "request_group", "parentId": "wrk_padelvision", "name": "01 - Health", "metaSortKey": -1000 },
+    { "_id": "fld_auth", "_type": "request_group", "parentId": "wrk_padelvision", "name": "02 - Auth", "metaSortKey": -900 },
+    { "_id": "fld_users", "_type": "request_group", "parentId": "wrk_padelvision", "name": "03 - Users", "metaSortKey": -800 },
+    { "_id": "fld_clubs", "_type": "request_group", "parentId": "wrk_padelvision", "name": "04 - Clubs", "metaSortKey": -700 },
+    { "_id": "fld_streams", "_type": "request_group", "parentId": "wrk_padelvision", "name": "05 - Streams", "metaSortKey": -600 },
+    { "_id": "fld_tournaments", "_type": "request_group", "parentId": "wrk_padelvision", "name": "06 - Tournaments", "metaSortKey": -500 },
+    { "_id": "fld_players", "_type": "request_group", "parentId": "wrk_padelvision", "name": "07 - Players", "metaSortKey": -400 },
+    { "_id": "fld_search", "_type": "request_group", "parentId": "wrk_padelvision", "name": "08 - Search", "metaSortKey": -300 },
+    { "_id": "fld_notifications", "_type": "request_group", "parentId": "wrk_padelvision", "name": "09 - Notifications", "metaSortKey": -200 },
+    { "_id": "fld_admin", "_type": "request_group", "parentId": "wrk_padelvision", "name": "10 - Admin", "metaSortKey": -100 },
+
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_health",
+      "name": "GET /api/health",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/health",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+
+    {
+      "_id": "req_auth_register",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "POST /api/auth/register",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/register",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.test_email }}\",\n  \"username\": \"{{ _.test_username }}\",\n  \"password\": \"{{ _.test_password }}\",\n  \"name\": \"{{ _.test_name }}\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "POST /api/auth/login",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/login",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.test_email }}\",\n  \"password\": \"{{ _.test_password }}\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_refresh",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "POST /api/auth/refresh",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/refresh",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Accept", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refreshToken\": \"{{ _.refresh_token }}\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_logout",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "POST /api/auth/logout",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/auth/logout",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+
+    {
+      "_id": "req_users_me_get",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "GET /api/users/me",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/users/me",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_users_me_put",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "PUT /api/users/me",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/api/users/me",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Updated Smoke User\",\n  \"city\": \"Warsaw\"\n}"
+      }
+    },
+    {
+      "_id": "req_users_id",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "GET /api/users/{id}",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/users/{{ _.user_id }}",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_users_id_stats",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "GET /api/users/{id}/stats",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/users/{{ _.user_id }}/stats",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_users_id_posts",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "GET /api/users/{id}/posts",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/users/{{ _.user_id }}/posts",
+      "parameters": [
+        { "name": "page", "value": "0" },
+        { "name": "size", "value": "20" }
+      ],
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+
+    {
+      "_id": "req_clubs_list",
+      "_type": "request",
+      "parentId": "fld_clubs",
+      "name": "GET /api/clubs",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/clubs",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_clubs_live_map",
+      "_type": "request",
+      "parentId": "fld_clubs",
+      "name": "GET /api/clubs/live-map",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/clubs/live-map",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_clubs_slug",
+      "_type": "request",
+      "parentId": "fld_clubs",
+      "name": "GET /api/clubs/{slug}",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/clubs/example-club",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_clubs_settings_get",
+      "_type": "request",
+      "parentId": "fld_clubs",
+      "name": "GET /api/clubs/settings (CLUB role)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/clubs/settings",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_clubs_analytics",
+      "_type": "request",
+      "parentId": "fld_clubs",
+      "name": "GET /api/clubs/analytics (CLUB role)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/clubs/analytics",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+
+    {
+      "_id": "req_streams_live",
+      "_type": "request",
+      "parentId": "fld_streams",
+      "name": "GET /api/streams/live",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/streams/live",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_streams_archived",
+      "_type": "request",
+      "parentId": "fld_streams",
+      "name": "GET /api/streams/archived",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/streams/archived",
+      "parameters": [
+        { "name": "page", "value": "0" },
+        { "name": "size", "value": "20" }
+      ],
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_streams_id",
+      "_type": "request",
+      "parentId": "fld_streams",
+      "name": "GET /api/streams/{id}",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/streams/1",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+
+    {
+      "_id": "req_tournaments_list",
+      "_type": "request",
+      "parentId": "fld_tournaments",
+      "name": "GET /api/tournaments",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/tournaments",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_tournaments_trending",
+      "_type": "request",
+      "parentId": "fld_tournaments",
+      "name": "GET /api/tournaments/trending",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/tournaments/trending",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_tournaments_create",
+      "_type": "request",
+      "parentId": "fld_tournaments",
+      "name": "POST /api/tournaments (CLUB role)",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/tournaments",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Insomnia Test Tournament\",\n  \"format\": \"ELIMINATION\",\n  \"category\": \"OPEN\",\n  \"level\": \"AMATEUR\",\n  \"date\": \"2026-05-01T10:00:00Z\",\n  \"endDate\": \"2026-05-02T20:00:00Z\",\n  \"maxPairs\": 16,\n  \"entryFee\": 50,\n  \"prizes\": \"500 PLN + puchar\",\n  \"isPPV\": false,\n  \"ppvPrice\": 0\n}"
+      }
+    },
+
+    {
+      "_id": "req_players_list",
+      "_type": "request",
+      "parentId": "fld_players",
+      "name": "GET /api/players",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/players",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_players_rankings",
+      "_type": "request",
+      "parentId": "fld_players",
+      "name": "GET /api/players/rankings",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/players/rankings",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+    {
+      "_id": "req_players_slug",
+      "_type": "request",
+      "parentId": "fld_players",
+      "name": "GET /api/players/{slug}",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/players/example-player",
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+
+    {
+      "_id": "req_search",
+      "_type": "request",
+      "parentId": "fld_search",
+      "name": "GET /api/search?q=padel",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/search",
+      "parameters": [{ "name": "q", "value": "padel" }],
+      "headers": [{ "name": "Accept", "value": "application/json" }]
+    },
+
+    {
+      "_id": "req_notifications_list",
+      "_type": "request",
+      "parentId": "fld_notifications",
+      "name": "GET /api/notifications",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/notifications",
+      "parameters": [
+        { "name": "page", "value": "0" },
+        { "name": "size", "value": "20" }
+      ],
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_notifications_read_all",
+      "_type": "request",
+      "parentId": "fld_notifications",
+      "name": "POST /api/notifications/read-all",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/notifications/read-all",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+
+    {
+      "_id": "req_admin_users",
+      "_type": "request",
+      "parentId": "fld_admin",
+      "name": "GET /api/admin/users (ADMIN role)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/admin/users",
+      "parameters": [
+        { "name": "page", "value": "0" },
+        { "name": "size", "value": "20" }
+      ],
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_admin_clubs",
+      "_type": "request",
+      "parentId": "fld_admin",
+      "name": "GET /api/admin/clubs (ADMIN role)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/admin/clubs",
+      "parameters": [
+        { "name": "page", "value": "0" },
+        { "name": "size", "value": "20" }
+      ],
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+    {
+      "_id": "req_admin_stats",
+      "_type": "request",
+      "parentId": "fld_admin",
+      "name": "GET /api/admin/stats (ADMIN role)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/admin/stats",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.access_token }}" },
+        { "name": "Accept", "value": "application/json" }
+      ]
+    },
+
+    {
+      "_id": "uts_smoke",
+      "_type": "unit_test_suite",
+      "parentId": "wrk_padelvision",
+      "name": "smoke",
+      "metaSortKey": 1
+    },
+
+    {
+      "_id": "ut_health",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "Health endpoint returns 200 OK with status field",
+      "requestId": "req_health",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.have.property('status');\n"
+    },
+    {
+      "_id": "ut_register",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "Register new user returns 200 with accessToken + refreshToken",
+      "requestId": "req_auth_register",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.be.oneOf([200, 201]);\nconst body = JSON.parse(response.data);\nexpect(body).to.have.property('accessToken');\nexpect(body).to.have.property('refreshToken');\nexpect(body).to.have.property('user');\nexpect(body.accessToken).to.be.a('string').and.not.empty;\nexpect(body.refreshToken).to.be.a('string').and.not.empty;\n"
+    },
+    {
+      "_id": "ut_login",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "Login with same credentials returns tokens",
+      "requestId": "req_auth_login",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.have.property('accessToken').that.is.a('string').and.not.empty;\nexpect(body).to.have.property('refreshToken').that.is.a('string').and.not.empty;\nexpect(body).to.have.property('user');\nexpect(body.user).to.have.property('id');\nexpect(body.user).to.have.property('email');\n"
+    },
+    {
+      "_id": "ut_clubs_list",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/clubs returns array",
+      "requestId": "req_clubs_list",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && Array.isArray(b.content)));\n"
+    },
+    {
+      "_id": "ut_clubs_live_map",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/clubs/live-map returns array",
+      "requestId": "req_clubs_live_map",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.be.an('array');\n"
+    },
+    {
+      "_id": "ut_streams_live",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/streams/live returns array",
+      "requestId": "req_streams_live",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && Array.isArray(b.content)));\n"
+    },
+    {
+      "_id": "ut_streams_archived",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/streams/archived returns paginated response",
+      "requestId": "req_streams_archived",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && (Array.isArray(b.content) || typeof b.totalElements === 'number')));\n"
+    },
+    {
+      "_id": "ut_tournaments_list",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/tournaments returns array",
+      "requestId": "req_tournaments_list",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && Array.isArray(b.content)));\n"
+    },
+    {
+      "_id": "ut_tournaments_trending",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/tournaments/trending returns array",
+      "requestId": "req_tournaments_trending",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && Array.isArray(b.content)));\n"
+    },
+    {
+      "_id": "ut_players_list",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/players returns array",
+      "requestId": "req_players_list",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && Array.isArray(b.content)));\n"
+    },
+    {
+      "_id": "ut_players_rankings",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/players/rankings returns array",
+      "requestId": "req_players_rankings",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.satisfy((b) => Array.isArray(b) || (b && Array.isArray(b.content)));\n"
+    },
+    {
+      "_id": "ut_search",
+      "_type": "unit_test",
+      "parentId": "uts_smoke",
+      "name": "GET /api/search?q=padel returns 200",
+      "requestId": "req_search",
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.equal(200);\nconst body = JSON.parse(response.data);\nexpect(body).to.be.an('object');\n"
+    }
+  ]
+}
