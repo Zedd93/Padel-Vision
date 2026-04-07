@@ -3,36 +3,37 @@ import {
   DollarSign,
   TrendingUp,
   CreditCard,
-  ArrowUpRight,
-  ArrowDownRight,
   Users,
   Coins,
   Film,
   Building2,
   Download,
-  Calendar,
   CheckCircle2,
   XCircle,
-  Clock,
   RefreshCw,
   ChevronDown,
   ChevronUp,
   Eye,
   Send,
-  AlertTriangle,
-  ArrowUpDown,
-  Filter,
   Wallet,
   Receipt,
-  BarChart3,
   FileText,
   Mail,
   Printer,
-  X,
   Copy,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { Link } from "react-router-dom";
+import {
+  Button,
+  Badge,
+  KpiCard,
+  Modal,
+  FilterTabs,
+  SectionHeader,
+  EmptyState,
+  type FilterTabOption,
+} from "@/components/ui";
 
 /* ─── Data ───────────────────────────────────────────── */
 
@@ -132,11 +133,11 @@ const CHART_COLORS: Record<ChartMetric, string> = {
 };
 
 const REVENUE_STREAMS = [
-  { source: "Subskrypcje platformy", icon: CreditCard, amount: "28 450 zł", amountNum: 28450, pct: 59, color: "bg-lime/60", barColor: "bg-lime" },
-  { source: "Subskrypcje kanałów (30%)", icon: Users, amount: "8 920 zł", amountNum: 8920, pct: 18, color: "bg-emerald-500/60", barColor: "bg-emerald-500" },
-  { source: "Piłki/Bits (30%)", icon: Coins, amount: "5 340 zł", amountNum: 5340, pct: 11, color: "bg-yellow-500/60", barColor: "bg-yellow-500" },
-  { source: "PPV (12%)", icon: Film, amount: "3 890 zł", amountNum: 3890, pct: 8, color: "bg-blue-500/60", barColor: "bg-blue-500" },
-  { source: "Plany klubowe (B2B)", icon: Building2, amount: "1 720 zł", amountNum: 1720, pct: 4, color: "bg-purple-500/60", barColor: "bg-purple-500" },
+  { source: "Subskrypcje platformy", icon: CreditCard, amount: "28 450 zł", amountNum: 28450, pct: 59, color: "bg-lime/60" },
+  { source: "Subskrypcje kanałów (30%)", icon: Users, amount: "8 920 zł", amountNum: 8920, pct: 18, color: "bg-emerald-500/60" },
+  { source: "Piłki/Bits (30%)", icon: Coins, amount: "5 340 zł", amountNum: 5340, pct: 11, color: "bg-yellow-500/60" },
+  { source: "PPV (12%)", icon: Film, amount: "3 890 zł", amountNum: 3890, pct: 8, color: "bg-blue-500/60" },
+  { source: "Plany klubowe (B2B)", icon: Building2, amount: "1 720 zł", amountNum: 1720, pct: 4, color: "bg-purple-500/60" },
 ];
 
 const INITIAL_PAYOUTS: PayoutData[] = [
@@ -170,9 +171,23 @@ const TX_TYPE_LABELS: Record<string, { label: string; color: string; icon: typeo
   club_plan: { label: "Plany klubowe", color: "text-purple-400", icon: Building2 },
 };
 
-type PayoutSort = "club" | "amountNum" | "date" | "status";
-type TxSort = "date" | "amountNum" | "type";
-type SortDir = "asc" | "desc";
+const DATE_RANGE_OPTIONS: FilterTabOption<DateRange>[] = [
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
+  { value: "12m", label: "12m" },
+];
+
+const CHART_METRIC_OPTIONS: FilterTabOption<ChartMetric>[] = [
+  { value: "mrr", label: "MRR" },
+  { value: "transactions", label: "Transakcje" },
+  { value: "payouts", label: "Wypłaty" },
+];
+
+const TX_FILTER_OPTIONS: FilterTabOption<TxFilter>[] = (Object.keys(TX_TYPE_LABELS) as TxFilter[]).map((t) => ({
+  value: t,
+  label: TX_TYPE_LABELS[t].label,
+}));
 
 /* ─── Invoice ─────────────────────────────────────── */
 
@@ -312,14 +327,10 @@ export default function AdminFinancePage() {
   const [payouts, setPayouts] = useState<PayoutData[]>(INITIAL_PAYOUTS);
   const [transactions] = useState<TransactionData[]>(INITIAL_TRANSACTIONS);
   const [txFilter, setTxFilter] = useState<TxFilter>("all");
-  const [txSort, setTxSort] = useState<TxSort>("date");
-  const [txSortDir, setTxSortDir] = useState<SortDir>("desc");
-  const [payoutSort, setPayoutSort] = useState<PayoutSort>("status");
-  const [payoutSortDir, setPayoutSortDir] = useState<SortDir>("asc");
+  const [showRevenueDetail, setShowRevenueDetail] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showPayoutConfirm, setShowPayoutConfirm] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
   const [showTxDetail, setShowTxDetail] = useState<string | null>(null);
-  const [showRevenueDetail, setShowRevenueDetail] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
@@ -345,13 +356,8 @@ export default function AdminFinancePage() {
   /* ─── Payouts ────────────────────────────────── */
 
   const sortedPayouts = [...payouts].sort((a, b) => {
-    const dir = payoutSortDir === "asc" ? 1 : -1;
-    if (payoutSort === "amountNum") return (a.amountNum - b.amountNum) * dir;
-    if (payoutSort === "status") {
-      const order = { pending: 0, approved: 1, paid: 2, rejected: 3 };
-      return (order[a.status] - order[b.status]) * dir;
-    }
-    return String(a[payoutSort]).localeCompare(String(b[payoutSort])) * dir;
+    const order = { pending: 0, approved: 1, paid: 2, rejected: 3 };
+    return order[a.status] - order[b.status];
   });
 
   const pendingTotal = payouts
@@ -405,11 +411,7 @@ export default function AdminFinancePage() {
 
   const filteredTx = transactions
     .filter((tx) => txFilter === "all" || tx.type === txFilter)
-    .sort((a, b) => {
-      const dir = txSortDir === "asc" ? 1 : -1;
-      if (txSort === "amountNum") return (a.amountNum - b.amountNum) * dir;
-      return String(a[txSort]).localeCompare(String(b[txSort])) * dir;
-    });
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   /* ─── Export ─────────────────────────────────── */
 
@@ -440,12 +442,14 @@ export default function AdminFinancePage() {
 
   const kpis = FINANCE_KPIS[dateRange];
   const detailTx = showTxDetail ? transactions.find((t) => t.id === showTxDetail) : null;
+  const payoutModal = showPayoutConfirm && payouts.find((p) => p.id === showPayoutConfirm.id);
+  const isApprove = showPayoutConfirm?.action === "approve";
 
   return (
     <div className="p-6">
       {/* Toast */}
       {toast && (
-        <div className="fixed right-6 top-20 z-50 animate-in slide-in-from-right rounded-lg border border-lime/30 bg-bg2 px-4 py-3 text-sm text-lime shadow-lg">
+        <div className="fixed right-6 top-20 z-50 rounded-lg border border-lime/30 bg-bg2 px-4 py-3 text-sm text-lime shadow-lg">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" />
             {toast}
@@ -454,68 +458,46 @@ export default function AdminFinancePage() {
       )}
 
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-display text-2xl">Finanse</h1>
-          <p className="text-xs text-muted">Przegląd finansowy platformy</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Date Range */}
-          <div className="flex rounded-lg border border-border bg-bg3">
-            {(["7d", "30d", "90d", "12m"] as DateRange[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setDateRange(r)}
-                className={cn(
-                  "px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                  dateRange === r ? "bg-lime/20 text-lime" : "text-muted hover:text-text"
-                )}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={handleRefresh}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg3 text-muted transition-colors hover:bg-bg4 hover:text-text"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg3 px-3 text-[11px] font-medium text-muted transition-colors hover:bg-bg4 hover:text-text"
-          >
-            <Download className="h-3.5 w-3.5" />
-            CSV
-          </button>
-        </div>
-      </div>
+      <SectionHeader
+        title="Finanse"
+        subtitle="Przegląd finansowy platformy"
+        actions={
+          <>
+            <FilterTabs
+              options={DATE_RANGE_OPTIONS}
+              value={dateRange}
+              onChange={setDateRange}
+              size="sm"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={handleRefresh}
+              loading={isRefreshing}
+              aria-label="Odśwież"
+            />
+            <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
+              CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Link
-              key={kpi.label}
-              to={kpi.href}
-              className="glass-card p-4 transition-all hover:border-lime/30 hover:ring-1 hover:ring-lime/20"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <Icon className={cn("h-5 w-5", kpi.color)} />
-                <span className={cn(
-                  "flex items-center gap-0.5 text-xs font-semibold",
-                  kpi.positive ? "text-emerald-400" : "text-red-400"
-                )}>
-                  {kpi.positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                  {kpi.change}
-                </span>
-              </div>
-              <p className="text-display text-2xl">{kpi.value}</p>
-              <p className="text-xs text-muted">{kpi.label}</p>
-            </Link>
-          );
-        })}
+        {kpis.map((kpi) => (
+          <KpiCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            change={kpi.change}
+            positive={kpi.positive}
+            icon={kpi.icon}
+            iconColor={kpi.color}
+            href={kpi.href}
+          />
+        ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -526,20 +508,12 @@ export default function AdminFinancePage() {
               <h2 className="text-sm font-semibold text-text">
                 {CHART_LABELS[chartMetric]} — ostatnie 7 miesięcy
               </h2>
-              <div className="flex rounded-lg border border-border bg-bg3">
-                {(["mrr", "transactions", "payouts"] as ChartMetric[]).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setChartMetric(m)}
-                    className={cn(
-                      "px-2.5 py-1 text-[10px] font-semibold transition-colors",
-                      chartMetric === m ? "bg-lime/20 text-lime" : "text-muted hover:text-text"
-                    )}
-                  >
-                    {m === "mrr" ? "MRR" : m === "transactions" ? "Transakcje" : "Wypłaty"}
-                  </button>
-                ))}
-              </div>
+              <FilterTabs
+                options={CHART_METRIC_OPTIONS}
+                value={chartMetric}
+                onChange={setChartMetric}
+                size="sm"
+              />
             </div>
             <div className="flex items-end gap-3" style={{ height: 180 }}>
               {chartData.map((m, i) => (
@@ -549,9 +523,8 @@ export default function AdminFinancePage() {
                   onMouseEnter={() => setHoveredBar(i)}
                   onMouseLeave={() => setHoveredBar(null)}
                 >
-                  {/* Tooltip */}
                   {hoveredBar === i && (
-                    <div className="absolute -top-10 z-10 rounded-lg border border-border bg-[#0B0C10] px-3 py-1.5 text-xs shadow-lg">
+                    <div className="absolute -top-10 z-10 rounded-lg border border-border bg-bg px-3 py-1.5 text-xs shadow-lg">
                       <span className="font-mono font-semibold text-text">
                         {chartMetric === "transactions"
                           ? m.amount.toLocaleString()
@@ -578,7 +551,6 @@ export default function AdminFinancePage() {
                 </div>
               ))}
             </div>
-            {/* Summary Row */}
             <div className="mt-4 flex gap-4 border-t border-border pt-3">
               <div>
                 <p className="text-[10px] text-muted">Suma</p>
@@ -607,9 +579,7 @@ export default function AdminFinancePage() {
 
           {/* Revenue Streams */}
           <div id="revenue" className="glass-card p-4">
-            <h2 className="mb-4 text-sm font-semibold text-text">
-              Źródła przychodu
-            </h2>
+            <h2 className="mb-4 text-sm font-semibold text-text">Źródła przychodu</h2>
             <div className="space-y-3">
               {REVENUE_STREAMS.map((src, i) => {
                 const Icon = src.icon;
@@ -626,7 +596,7 @@ export default function AdminFinancePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs text-text">{src.amount}</span>
-                        <span className="rounded-full bg-bg4 px-1.5 py-0.5 text-[10px] text-muted">{src.pct}%</span>
+                        <Badge variant="neutral" size="xs">{src.pct}%</Badge>
                         {isExpanded ? (
                           <ChevronUp className="h-3 w-3 text-lime" />
                         ) : (
@@ -640,7 +610,6 @@ export default function AdminFinancePage() {
                         style={{ width: `${src.pct}%` }}
                       />
                     </div>
-                    {/* Expanded detail */}
                     {isExpanded && (
                       <div className="mt-2 rounded-lg bg-bg3 p-3">
                         <div className="grid grid-cols-3 gap-3 text-xs">
@@ -667,7 +636,6 @@ export default function AdminFinancePage() {
                 );
               })}
             </div>
-            {/* Total */}
             <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
               <span className="text-xs text-muted">Łączny przychód</span>
               <span className="font-mono text-sm font-bold text-lime">
@@ -681,25 +649,32 @@ export default function AdminFinancePage() {
           {/* Pending Payouts */}
           <div className="glass-card overflow-visible">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-text">
-                Oczekujące wypłaty
-              </h2>
+              <h2 className="text-sm font-semibold text-text">Oczekujące wypłaty</h2>
               {payouts.filter((p) => p.status === "pending").length > 0 && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  icon={CheckCircle2}
                   onClick={handleApproveAll}
-                  className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/30"
+                  className="!text-emerald-400 hover:!bg-emerald-500/20"
                 >
-                  <CheckCircle2 className="h-3 w-3" />
                   Zatwierdź wszystkie
-                </button>
+                </Button>
               )}
             </div>
             <div className="divide-y divide-border">
               {sortedPayouts.map((p) => {
                 const isPending = p.status === "pending";
-                const isApproved = p.status === "approved";
-                const isPaid = p.status === "paid";
-                const isRejected = p.status === "rejected";
+                const variant =
+                  p.status === "pending" ? "warning"
+                  : p.status === "approved" ? "success"
+                  : p.status === "paid" ? "info"
+                  : "danger";
+                const label =
+                  p.status === "pending" ? "Oczekuje"
+                  : p.status === "approved" ? "Zatwierdzona"
+                  : p.status === "paid" ? "Wypłacona"
+                  : "Odrzucona";
                 return (
                   <div key={p.id} className="px-4 py-2.5 transition-colors hover:bg-bg3/50">
                     <div className="flex items-center justify-between">
@@ -714,17 +689,7 @@ export default function AdminFinancePage() {
                     <div className="mt-1 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] text-muted">{p.date} · {p.method}</p>
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
-                            isPending && "bg-yellow-500/20 text-yellow-400",
-                            isApproved && "bg-emerald-500/20 text-emerald-400",
-                            isPaid && "bg-blue-500/20 text-blue-400",
-                            isRejected && "bg-red-500/20 text-red-400"
-                          )}
-                        >
-                          {isPending ? "Oczekuje" : isApproved ? "Zatwierdzona" : isPaid ? "Wypłacona" : "Odrzucona"}
-                        </span>
+                        <Badge variant={variant} size="xs">{label}</Badge>
                       </div>
                       {isPending && (
                         <div className="flex gap-1">
@@ -763,32 +728,18 @@ export default function AdminFinancePage() {
           <div className="glass-card overflow-visible">
             <div className="border-b border-border px-4 py-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-text">
-                  Transakcje
-                </h2>
-                <span className="rounded-full bg-bg4 px-2 py-0.5 text-[10px] text-muted">
-                  {filteredTx.length}
-                </span>
+                <h2 className="text-sm font-semibold text-text">Transakcje</h2>
+                <Badge variant="neutral" size="xs">{filteredTx.length}</Badge>
               </div>
-              {/* Filter chips */}
-              <div className="mt-2 flex flex-wrap gap-1">
-                {(Object.keys(TX_TYPE_LABELS) as TxFilter[]).map((t) => {
-                  const info = TX_TYPE_LABELS[t];
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => setTxFilter(t)}
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors",
-                        txFilter === t
-                          ? "bg-lime/20 text-lime"
-                          : "bg-bg3 text-muted hover:text-text"
-                      )}
-                    >
-                      {info.label}
-                    </button>
-                  );
-                })}
+              <div className="mt-2">
+                <FilterTabs
+                  options={TX_FILTER_OPTIONS}
+                  value={txFilter}
+                  onChange={setTxFilter}
+                  size="sm"
+                  variant="pills"
+                  className="flex-wrap"
+                />
               </div>
             </div>
             <div className="divide-y divide-border">
@@ -801,7 +752,7 @@ export default function AdminFinancePage() {
                     onClick={() => setShowTxDetail(tx.id)}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-bg3/50"
                   >
-                    <div className={cn("flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-bg4")}>
+                    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-bg4">
                       <Icon className={cn("h-3.5 w-3.5", typeInfo?.color)} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -843,21 +794,19 @@ export default function AdminFinancePage() {
 
       {/* ─── Invoices Section ───────────────────── */}
       <div className="mt-8">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-display text-lg">Faktury</h2>
-            <p className="text-xs text-muted">Automatycznie wystawiane przy zatwierdzeniu wypłaty</p>
-          </div>
-          <span className="rounded-full bg-bg4 px-3 py-1 text-xs text-muted">
-            {invoices.length} faktur
-          </span>
-        </div>
+        <SectionHeader
+          title="Faktury"
+          subtitle="Automatycznie wystawiane przy zatwierdzeniu wypłaty"
+          level="h3"
+          actions={<Badge variant="neutral" size="md">{invoices.length} faktur</Badge>}
+        />
 
         {invoices.length === 0 ? (
-          <div className="glass-card flex flex-col items-center gap-3 p-10 text-center">
-            <FileText className="h-10 w-10 text-muted" />
-            <p className="text-sm text-muted">Brak faktur — pojawią się tu po zatwierdzeniu pierwszej wypłaty.</p>
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="Brak faktur"
+            description="Pojawią się tu po zatwierdzeniu pierwszej wypłaty."
+          />
         ) : (
           <div className="glass-card overflow-hidden">
             <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-x-4 border-b border-border px-4 py-2 text-[10px] font-bold uppercase text-muted">
@@ -894,14 +843,9 @@ export default function AdminFinancePage() {
                   {inv.amountGross.toLocaleString("pl-PL")} zł
                 </span>
                 <span className="text-[11px] text-muted">{inv.issuedAt}</span>
-                <span className={cn(
-                  "rounded-full px-2 py-0.5 text-[9px] font-bold",
-                  inv.status === "paid"
-                    ? "bg-blue-500/20 text-blue-400"
-                    : "bg-emerald-500/20 text-emerald-400"
-                )}>
+                <Badge variant={inv.status === "paid" ? "info" : "success"} size="xs">
                   {inv.status === "paid" ? "Opłacona" : "Wysłana"}
-                </span>
+                </Badge>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setPreviewInvoice(inv)}
@@ -925,266 +869,213 @@ export default function AdminFinancePage() {
       </div>
 
       {/* ─── Invoice Preview Modal ───────────────── */}
-      {previewInvoice && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setPreviewInvoice(null)}
-        >
-          <div
-            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-[#0B0C10] shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-lime" />
-                <div>
-                  <h3 className="text-display text-base">Faktura {previewInvoice.number}</h3>
-                  <p className="text-[11px] text-muted">Wystawiona: {previewInvoice.issuedAt}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePrintInvoice(previewInvoice)}
-                  className="flex items-center gap-1.5 rounded-lg bg-bg3 px-3 py-1.5 text-xs text-muted hover:bg-bg4 hover:text-text"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  Drukuj
-                </button>
-                <button onClick={() => setPreviewInvoice(null)} className="text-muted hover:text-text">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            <div className="p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg bg-bg3 p-4">
-                  <p className="mb-2 text-[10px] font-bold uppercase text-muted">Sprzedawca</p>
-                  <p className="text-sm font-semibold text-text">{SELLER.name}</p>
-                  <p className="mt-1 text-xs text-muted leading-relaxed">
-                    {SELLER.address}<br />
-                    NIP: {SELLER.nip}<br />
-                    <span className="font-mono text-[10px]">{SELLER.bank}</span>
-                  </p>
-                </div>
-                <div className="rounded-lg bg-bg3 p-4">
-                  <p className="mb-2 text-[10px] font-bold uppercase text-muted">Nabywca</p>
-                  <p className="text-sm font-semibold text-text">{previewInvoice.club}</p>
-                  <p className="mt-1 text-xs text-muted leading-relaxed">
-                    {previewInvoice.clubAddress}<br />
-                    NIP: {previewInvoice.clubNip}<br />
-                    <span className="text-lime">{previewInvoice.clubEmail}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="overflow-hidden rounded-lg border border-border">
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 bg-bg3 px-4 py-2 text-[10px] font-bold uppercase text-muted">
-                  <span>Usługa</span>
-                  <span className="text-right">Netto</span>
-                  <span className="text-right">VAT</span>
-                  <span className="text-right">Brutto</span>
-                </div>
-                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 text-sm">
-                  <div>
-                    <p className="font-medium text-text">Wypłata przychodów z platformy PadelVision</p>
-                    <p className="text-[11px] text-muted">Metoda: {previewInvoice.method}</p>
-                  </div>
-                  <span className="font-mono text-text">{previewInvoice.amountNet.toFixed(2)} zł</span>
-                  <span className="font-mono text-muted">{previewInvoice.vatRate}%</span>
-                  <span className="font-mono font-semibold text-lime">{previewInvoice.amountGross.toFixed(2)} zł</span>
-                </div>
-              </div>
-              <div className="ml-auto w-56 space-y-1.5 rounded-lg bg-bg3 p-4">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">Netto</span>
-                  <span className="font-mono text-text">{previewInvoice.amountNet.toFixed(2)} zł</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted">VAT ({previewInvoice.vatRate}%)</span>
-                  <span className="font-mono text-text">{previewInvoice.vatAmount.toFixed(2)} zł</span>
-                </div>
-                <div className="flex justify-between border-t border-border pt-2 text-sm font-bold">
-                  <span className="text-text">Do zapłaty</span>
-                  <span className="font-mono text-lime">{previewInvoice.amountGross.toFixed(2)} zł</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
-                <Mail className="h-4 w-4 flex-shrink-0 text-emerald-400" />
-                <p className="text-xs text-emerald-400">
-                  Faktura została automatycznie wysłana na adres{" "}
-                  <span className="font-semibold">{previewInvoice.clubEmail}</span>{" "}
-                  w dniu {previewInvoice.issuedAt}.
+      <Modal
+        isOpen={!!previewInvoice}
+        onClose={() => setPreviewInvoice(null)}
+        size="lg"
+        icon={FileText}
+        title={previewInvoice ? `Faktura ${previewInvoice.number}` : ""}
+        subtitle={previewInvoice ? `Wystawiona: ${previewInvoice.issuedAt}` : undefined}
+      >
+        {previewInvoice && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg bg-bg3 p-4">
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted">Sprzedawca</p>
+                <p className="text-sm font-semibold text-text">{SELLER.name}</p>
+                <p className="mt-1 text-xs text-muted leading-relaxed">
+                  {SELLER.address}<br />
+                  NIP: {SELLER.nip}<br />
+                  <span className="font-mono text-[10px]">{SELLER.bank}</span>
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-bg3 p-3">
-                  <p className="text-[10px] text-muted">Data wystawienia</p>
-                  <p className="text-sm font-medium text-text">{previewInvoice.issuedAt}</p>
-                </div>
-                <div className="rounded-lg bg-bg3 p-3">
-                  <p className="text-[10px] text-muted">Termin płatności</p>
-                  <p className="text-sm font-medium text-text">{previewInvoice.dueAt}</p>
-                </div>
+              <div className="rounded-lg bg-bg3 p-4">
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted">Nabywca</p>
+                <p className="text-sm font-semibold text-text">{previewInvoice.club}</p>
+                <p className="mt-1 text-xs text-muted leading-relaxed">
+                  {previewInvoice.clubAddress}<br />
+                  NIP: {previewInvoice.clubNip}<br />
+                  <span className="text-lime">{previewInvoice.clubEmail}</span>
+                </p>
               </div>
             </div>
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 bg-bg3 px-4 py-2 text-[10px] font-bold uppercase text-muted">
+                <span>Usługa</span>
+                <span className="text-right">Netto</span>
+                <span className="text-right">VAT</span>
+                <span className="text-right">Brutto</span>
+              </div>
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-medium text-text">Wypłata przychodów z platformy PadelVision</p>
+                  <p className="text-[11px] text-muted">Metoda: {previewInvoice.method}</p>
+                </div>
+                <span className="font-mono text-text">{previewInvoice.amountNet.toFixed(2)} zł</span>
+                <span className="font-mono text-muted">{previewInvoice.vatRate}%</span>
+                <span className="font-mono font-semibold text-lime">{previewInvoice.amountGross.toFixed(2)} zł</span>
+              </div>
+            </div>
+            <div className="ml-auto w-56 space-y-1.5 rounded-lg bg-bg3 p-4">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted">Netto</span>
+                <span className="font-mono text-text">{previewInvoice.amountNet.toFixed(2)} zł</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted">VAT ({previewInvoice.vatRate}%)</span>
+                <span className="font-mono text-text">{previewInvoice.vatAmount.toFixed(2)} zł</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2 text-sm font-bold">
+                <span className="text-text">Do zapłaty</span>
+                <span className="font-mono text-lime">{previewInvoice.amountGross.toFixed(2)} zł</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+              <Mail className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+              <p className="text-xs text-emerald-400">
+                Faktura została automatycznie wysłana na adres{" "}
+                <span className="font-semibold">{previewInvoice.clubEmail}</span>{" "}
+                w dniu {previewInvoice.issuedAt}.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-bg3 p-3">
+                <p className="text-[10px] text-muted">Data wystawienia</p>
+                <p className="text-sm font-medium text-text">{previewInvoice.issuedAt}</p>
+              </div>
+              <div className="rounded-lg bg-bg3 p-3">
+                <p className="text-[10px] text-muted">Termin płatności</p>
+                <p className="text-sm font-medium text-text">{previewInvoice.dueAt}</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" icon={Printer} onClick={() => handlePrintInvoice(previewInvoice)}>
+                Drukuj
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* ─── Payout Confirm Modal ───────────────── */}
-      {showPayoutConfirm && (() => {
-        const payout = payouts.find((p) => p.id === showPayoutConfirm.id);
-        if (!payout) return null;
-        const isApprove = showPayoutConfirm.action === "approve";
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            onClick={() => setShowPayoutConfirm(null)}
-          >
-            <div
-              className="w-96 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center gap-3">
-                <div className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full",
-                  isApprove ? "bg-emerald-500/20" : "bg-red-500/20"
-                )}>
-                  {isApprove ? (
-                    <Send className="h-5 w-5 text-emerald-400" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-red-400" />
-                  )}
+      <Modal
+        isOpen={!!showPayoutConfirm}
+        onClose={() => setShowPayoutConfirm(null)}
+        size="sm"
+        icon={isApprove ? Send : XCircle}
+        iconColor={isApprove ? "text-emerald-400" : "text-red-400"}
+        iconBgColor={isApprove ? "bg-emerald-500/20" : "bg-red-500/20"}
+        title={isApprove ? "Zatwierdź wypłatę" : "Odrzuć wypłatę"}
+        subtitle={payoutModal ? payoutModal.club : undefined}
+        footer={
+          payoutModal && (
+            <>
+              <Button variant="secondary" onClick={() => setShowPayoutConfirm(null)}>
+                Anuluj
+              </Button>
+              <Button
+                variant={isApprove ? "primary" : "danger"}
+                onClick={() => handlePayoutAction(payoutModal.id, showPayoutConfirm!.action)}
+              >
+                {isApprove ? "Zatwierdź" : "Odrzuć"}
+              </Button>
+            </>
+          )
+        }
+      >
+        {payoutModal && (
+          <>
+            <div className="rounded-lg bg-bg3 p-3">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="text-[10px] text-muted">Kwota</p>
+                  <p className="font-mono font-semibold text-orange">{payoutModal.amount}</p>
                 </div>
                 <div>
-                  <h3 className="text-display text-lg">
-                    {isApprove ? "Zatwierdź wypłatę" : "Odrzuć wypłatę"}
-                  </h3>
-                  <p className="text-xs text-muted">{payout.club}</p>
+                  <p className="text-[10px] text-muted">Data</p>
+                  <p className="text-text">{payoutModal.date}</p>
                 </div>
-              </div>
-              <div className="rounded-lg bg-bg3 p-3">
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <p className="text-[10px] text-muted">Kwota</p>
-                    <p className="font-mono font-semibold text-orange">{payout.amount}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted">Data</p>
-                    <p className="text-text">{payout.date}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-[10px] text-muted">Metoda</p>
-                    <p className="text-text">{payout.method}</p>
-                  </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] text-muted">Metoda</p>
+                  <p className="text-text">{payoutModal.method}</p>
                 </div>
-              </div>
-              {isApprove && (
-                <div className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5">
-                  <Mail className="h-4 w-4 flex-shrink-0 text-emerald-400 mt-0.5" />
-                  <p className="text-xs text-emerald-400">
-                    Faktura VAT zostanie automatycznie wystawiona i wysłana na adres email klubu.
-                  </p>
-                </div>
-              )}
-              <p className="mt-3 text-sm text-muted">
-                {isApprove
-                  ? "Wypłata zostanie przetworzona przez Stripe Connect. Środki trafią na konto klubu w ciągu 2-3 dni roboczych."
-                  : "Odrzucona wypłata wróci do salda klubu. Czy na pewno chcesz odrzucić tę wypłatę?"}
-              </p>
-              <div className="mt-5 flex gap-3">
-                <button
-                  onClick={() => setShowPayoutConfirm(null)}
-                  className="btn-secondary flex-1 py-2.5 text-sm"
-                >
-                  Anuluj
-                </button>
-                <button
-                  onClick={() => handlePayoutAction(payout.id, showPayoutConfirm.action)}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors",
-                    isApprove
-                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                      : "bg-red-500 text-white hover:bg-red-600"
-                  )}
-                >
-                  {isApprove ? "Zatwierdź" : "Odrzuć"}
-                </button>
               </div>
             </div>
-          </div>
-        );
-      })()}
+            {isApprove && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5">
+                <Mail className="h-4 w-4 flex-shrink-0 text-emerald-400 mt-0.5" />
+                <p className="text-xs text-emerald-400">
+                  Faktura VAT zostanie automatycznie wystawiona i wysłana na adres email klubu.
+                </p>
+              </div>
+            )}
+            <p className="mt-3 text-sm text-muted">
+              {isApprove
+                ? "Wypłata zostanie przetworzona przez Stripe Connect. Środki trafią na konto klubu w ciągu 2-3 dni roboczych."
+                : "Odrzucona wypłata wróci do salda klubu. Czy na pewno chcesz odrzucić tę wypłatę?"}
+            </p>
+          </>
+        )}
+      </Modal>
 
       {/* ─── Transaction Detail Modal ───────────── */}
-      {showTxDetail && detailTx && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setShowTxDetail(null)}
-        >
-          <div
-            className="w-96 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center gap-3">
-              <div className={cn("flex h-10 w-10 items-center justify-center rounded-full bg-bg4")}>
-                {(() => {
-                  const Icon = TX_TYPE_LABELS[detailTx.type]?.icon || Receipt;
-                  return <Icon className={cn("h-5 w-5", TX_TYPE_LABELS[detailTx.type]?.color)} />;
-                })()}
-              </div>
-              <div>
-                <h3 className="text-display text-base">Szczegóły transakcji</h3>
-                <p className="text-xs text-muted">ID: {detailTx.id}</p>
-              </div>
+      <Modal
+        isOpen={!!showTxDetail}
+        onClose={() => setShowTxDetail(null)}
+        size="sm"
+        icon={detailTx ? (TX_TYPE_LABELS[detailTx.type]?.icon || Receipt) : Receipt}
+        iconColor={detailTx ? TX_TYPE_LABELS[detailTx.type]?.color : "text-text"}
+        iconBgColor="bg-bg4"
+        title="Szczegóły transakcji"
+        subtitle={detailTx ? `ID: ${detailTx.id}` : undefined}
+        footer={
+          <Button variant="secondary" onClick={() => setShowTxDetail(null)}>
+            Zamknij
+          </Button>
+        }
+      >
+        {detailTx && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-bg3 p-3">
+              <p className="text-[10px] text-muted">Opis</p>
+              <p className="text-sm text-text">{detailTx.desc}</p>
             </div>
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-bg3 p-3">
-                <p className="text-[10px] text-muted">Opis</p>
-                <p className="text-sm text-text">{detailTx.desc}</p>
+                <p className="text-[10px] text-muted">Kwota</p>
+                <p className={cn(
+                  "font-mono text-lg font-semibold",
+                  detailTx.amountNum >= 0 ? "text-emerald-400" : "text-red-400"
+                )}>
+                  {detailTx.amount}
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-bg3 p-3">
-                  <p className="text-[10px] text-muted">Kwota</p>
-                  <p className={cn(
-                    "font-mono text-lg font-semibold",
-                    detailTx.amountNum >= 0 ? "text-emerald-400" : "text-red-400"
-                  )}>
-                    {detailTx.amount}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-bg3 p-3">
-                  <p className="text-[10px] text-muted">Data</p>
-                  <p className="text-sm text-text">{detailTx.date} 2025</p>
-                </div>
-                <div className="rounded-lg bg-bg3 p-3">
-                  <p className="text-[10px] text-muted">Typ</p>
-                  <span className={cn("text-sm font-semibold", TX_TYPE_LABELS[detailTx.type]?.color)}>
-                    {TX_TYPE_LABELS[detailTx.type]?.label}
-                  </span>
-                </div>
-                {detailTx.user && (
-                  <div className="rounded-lg bg-bg3 p-3">
-                    <p className="text-[10px] text-muted">Użytkownik</p>
-                    <p className="text-sm text-text">{detailTx.user}</p>
-                  </div>
-                )}
+              <div className="rounded-lg bg-bg3 p-3">
+                <p className="text-[10px] text-muted">Data</p>
+                <p className="text-sm text-text">{detailTx.date} 2025</p>
               </div>
-              {detailTx.detail && (
+              <div className="rounded-lg bg-bg3 p-3">
+                <p className="text-[10px] text-muted">Typ</p>
+                <span className={cn("text-sm font-semibold", TX_TYPE_LABELS[detailTx.type]?.color)}>
+                  {TX_TYPE_LABELS[detailTx.type]?.label}
+                </span>
+              </div>
+              {detailTx.user && (
                 <div className="rounded-lg bg-bg3 p-3">
-                  <p className="text-[10px] text-muted">Szczegóły</p>
-                  <p className="text-sm text-text">{detailTx.detail}</p>
+                  <p className="text-[10px] text-muted">Użytkownik</p>
+                  <p className="text-sm text-text">{detailTx.user}</p>
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setShowTxDetail(null)}
-              className="btn-secondary mt-5 w-full py-2 text-sm"
-            >
-              Zamknij
-            </button>
+            {detailTx.detail && (
+              <div className="rounded-lg bg-bg3 p-3">
+                <p className="text-[10px] text-muted">Szczegóły</p>
+                <p className="text-sm text-text">{detailTx.detail}</p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

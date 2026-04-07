@@ -4,11 +4,8 @@ import {
   Users,
   Building2,
   DollarSign,
-  TrendingUp,
   Eye,
   Radio,
-  ArrowUpRight,
-  ArrowDownRight,
   ChevronRight,
   Download,
   RefreshCw,
@@ -19,6 +16,14 @@ import {
   Briefcase,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import {
+  Button,
+  Badge,
+  KpiCard,
+  FilterTabs,
+  SectionHeader,
+  type FilterTabOption,
+} from "@/components/ui";
 
 /* ─── Data ───────────────────────────────────────────── */
 
@@ -107,30 +112,35 @@ const TOP_CLUBS = [
   { name: "Viva Padel Poznań", slug: "viva-padel-poznan", revenue: "1,870 zł", subs: 31, streams: 6 },
 ];
 
-/* ─── Types ──────────────────────────────────────────── */
+/* ─── Types & Options ────────────────────────────────── */
 
 type ChartPeriod = "week" | "month";
 type ChartMetric = "viewers" | "revenue";
 type DateRange = "7d" | "30d" | "90d";
 
-/* ─── Activity Type Colors ───────────────────────────── */
+const DATE_RANGE_OPTIONS: FilterTabOption<DateRange>[] = [
+  { value: "7d", label: "7 dni" },
+  { value: "30d", label: "30 dni" },
+  { value: "90d", label: "90 dni" },
+];
 
-const ACTIVITY_COLORS: Record<string, string> = {
-  stream: "bg-live/20 text-live",
-  club: "bg-emerald-500/20 text-emerald-400",
-  purchase: "bg-lime/20 text-lime",
-  sub: "bg-blue-500/20 text-blue-400",
-  payout: "bg-orange/20 text-orange",
-  mod: "bg-red-500/20 text-red-400",
-};
+const CHART_METRIC_OPTIONS: FilterTabOption<ChartMetric>[] = [
+  { value: "viewers", label: "Widzowie", icon: Eye },
+  { value: "revenue", label: "Przychód", icon: DollarSign },
+];
 
-const ACTIVITY_LABELS: Record<string, string> = {
-  stream: "LIVE",
-  club: "KLUB",
-  purchase: "PPV",
-  sub: "SUB",
-  payout: "PAY",
-  mod: "MOD",
+const CHART_PERIOD_OPTIONS: FilterTabOption<ChartPeriod>[] = [
+  { value: "week", label: "Tydzień" },
+  { value: "month", label: "Miesiąc" },
+];
+
+const ACTIVITY_BADGE: Record<string, { variant: "live" | "success" | "lime" | "info" | "orange" | "danger"; label: string }> = {
+  stream: { variant: "live", label: "LIVE" },
+  club: { variant: "success", label: "KLUB" },
+  purchase: { variant: "lime", label: "PPV" },
+  sub: { variant: "info", label: "SUB" },
+  payout: { variant: "orange", label: "PAY" },
+  mod: { variant: "danger", label: "MOD" },
 };
 
 /* ─── Component ──────────────────────────────────────── */
@@ -179,103 +189,58 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   };
 
+  const dateLabel = dateRange === "7d" ? "7 dni" : dateRange === "30d" ? "30 dni" : "90 dni";
+
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-display text-2xl">Dashboard</h1>
-          <p className="text-xs text-muted">
-            Przegląd platformy — ostatnie{" "}
-            {dateRange === "7d" ? "7 dni" : dateRange === "30d" ? "30 dni" : "90 dni"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Date range filter */}
-          <div className="flex items-center rounded-lg border border-border bg-bg3">
-            {(["7d", "30d", "90d"] as DateRange[]).map((range) => (
-              <button
-                key={range}
-                onClick={() => setDateRange(range)}
-                className={cn(
-                  "px-3 py-1.5 text-[11px] font-medium transition-colors",
-                  dateRange === range
-                    ? "bg-lime/10 text-lime"
-                    : "text-muted hover:text-text"
-                )}
-              >
-                {range === "7d" ? "7 dni" : range === "30d" ? "30 dni" : "90 dni"}
-              </button>
-            ))}
-          </div>
-
-          {/* Refresh */}
-          <button
-            onClick={handleRefresh}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-bg3 text-muted transition-colors hover:bg-bg4 hover:text-text"
-            title="Odśwież dane"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-          </button>
-
-          {/* Export */}
-          <button
-            onClick={handleExportCSV}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg3 px-3 text-[11px] font-medium text-muted transition-colors hover:bg-bg4 hover:text-text"
-            title="Eksportuj CSV"
-          >
-            <Download className="h-3.5 w-3.5" />
-            CSV
-          </button>
-
-          {/* Live badge */}
-          <Link
-            to="/admin/clubs"
-            className="flex items-center gap-1.5 rounded-full bg-live/20 px-3 py-1 text-xs font-semibold text-live transition-colors hover:bg-live/30"
-          >
-            <Radio className="h-3 w-3 animate-pulse" />
-            2 live
-          </Link>
-        </div>
-      </div>
+      <SectionHeader
+        title="Dashboard"
+        subtitle={`Przegląd platformy — ostatnie ${dateLabel}`}
+        actions={
+          <>
+            <FilterTabs
+              options={DATE_RANGE_OPTIONS}
+              value={dateRange}
+              onChange={setDateRange}
+              size="sm"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              onClick={handleRefresh}
+              loading={isRefreshing}
+              aria-label="Odśwież dane"
+            />
+            <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
+              CSV
+            </Button>
+            <Link to="/admin/clubs">
+              <Badge variant="live" size="md" pulse>
+                <Radio className="h-3 w-3" />
+                2 live
+              </Badge>
+            </Link>
+          </>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {KPI_CARDS.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Link
-              key={kpi.label}
-              to={kpi.href}
-              className="glass-card group relative cursor-pointer p-4 transition-all duration-200 hover:border-border hover:scale-[1.02]"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <Icon className={cn("h-5 w-5", kpi.color)} />
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "flex items-center gap-0.5 text-xs font-semibold",
-                      kpi.up ? "text-emerald-400" : "text-red-400"
-                    )}
-                  >
-                    {kpi.up ? (
-                      <ArrowUpRight className="h-3 w-3" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3" />
-                    )}
-                    {kpi.change}
-                  </span>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
-              </div>
-              <p className="text-display text-2xl">{kpi.value}</p>
-              <p className="text-xs text-muted">{kpi.label}</p>
-              <p className="mt-1 text-[10px] text-muted opacity-0 transition-opacity group-hover:opacity-100">
-                {kpi.description}
-              </p>
-            </Link>
-          );
-        })}
+        {KPI_CARDS.map((kpi) => (
+          <KpiCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            change={kpi.change}
+            positive={kpi.up}
+            icon={kpi.icon}
+            iconColor={kpi.color}
+            href={kpi.href}
+            description={kpi.description}
+          />
+        ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -283,64 +248,24 @@ export default function AdminPage() {
         <div className="space-y-6 lg:col-span-2">
           {/* Weekly Viewership Chart */}
           <div className="glass-card p-4">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-text">
                 {chartMetric === "viewers" ? "Widzowie" : "Przychód"} —{" "}
                 {chartPeriod === "week" ? "ten tydzień" : "ten miesiąc"}
               </h2>
               <div className="flex items-center gap-2">
-                {/* Metric toggle */}
-                <div className="flex items-center rounded-md border border-border bg-bg3">
-                  <button
-                    onClick={() => setChartMetric("viewers")}
-                    className={cn(
-                      "flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium transition-colors",
-                      chartMetric === "viewers"
-                        ? "bg-lime/10 text-lime"
-                        : "text-muted hover:text-text"
-                    )}
-                  >
-                    <Eye className="h-3 w-3" />
-                    Widzowie
-                  </button>
-                  <button
-                    onClick={() => setChartMetric("revenue")}
-                    className={cn(
-                      "flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium transition-colors",
-                      chartMetric === "revenue"
-                        ? "bg-lime/10 text-lime"
-                        : "text-muted hover:text-text"
-                    )}
-                  >
-                    <DollarSign className="h-3 w-3" />
-                    Przychód
-                  </button>
-                </div>
-                {/* Period toggle */}
-                <div className="flex items-center rounded-md border border-border bg-bg3">
-                  <button
-                    onClick={() => setChartPeriod("week")}
-                    className={cn(
-                      "px-2.5 py-1 text-[10px] font-medium transition-colors",
-                      chartPeriod === "week"
-                        ? "bg-lime/10 text-lime"
-                        : "text-muted hover:text-text"
-                    )}
-                  >
-                    Tydzień
-                  </button>
-                  <button
-                    onClick={() => setChartPeriod("month")}
-                    className={cn(
-                      "px-2.5 py-1 text-[10px] font-medium transition-colors",
-                      chartPeriod === "month"
-                        ? "bg-lime/10 text-lime"
-                        : "text-muted hover:text-text"
-                    )}
-                  >
-                    Miesiąc
-                  </button>
-                </div>
+                <FilterTabs
+                  options={CHART_METRIC_OPTIONS}
+                  value={chartMetric}
+                  onChange={setChartMetric}
+                  size="sm"
+                />
+                <FilterTabs
+                  options={CHART_PERIOD_OPTIONS}
+                  value={chartPeriod}
+                  onChange={setChartPeriod}
+                  size="sm"
+                />
               </div>
             </div>
             <div className="flex items-end gap-3" style={{ height: 160 }}>
@@ -354,7 +279,6 @@ export default function AdminPage() {
                     onMouseEnter={() => setHoveredBar(i)}
                     onMouseLeave={() => setHoveredBar(null)}
                   >
-                    {/* Tooltip */}
                     {isHovered && (
                       <div className="absolute -top-10 z-10 rounded-lg border border-border bg-bg2 px-3 py-1.5 text-center shadow-lg">
                         <p className="text-[10px] font-semibold text-lime">
@@ -429,9 +353,7 @@ export default function AdminPage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-text">{src.amount}</span>
-                        <span className="rounded bg-bg4 px-1.5 py-0.5 text-[10px] text-muted">
-                          {src.pct}%
-                        </span>
+                        <Badge variant="neutral" size="xs">{src.pct}%</Badge>
                       </div>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-bg4">
@@ -462,9 +384,7 @@ export default function AdminPage() {
           {/* Recent Activity */}
           <div className="glass-card overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-text">
-                Ostatnia aktywność
-              </h2>
+              <h2 className="text-sm font-semibold text-text">Ostatnia aktywność</h2>
               <button
                 onClick={handleRefresh}
                 className="text-[10px] text-muted transition-colors hover:text-lime"
@@ -473,31 +393,29 @@ export default function AdminPage() {
               </button>
             </div>
             <div className="divide-y divide-border">
-              {RECENT_ACTIVITY.map((a, i) => (
-                <Link
-                  key={i}
-                  to={a.href}
-                  className="group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-bg3"
-                >
-                  <span
-                    className={cn(
-                      "mt-0.5 flex-shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold",
-                      ACTIVITY_COLORS[a.type] || "bg-bg4 text-muted"
-                    )}
+              {RECENT_ACTIVITY.map((a, i) => {
+                const badge = ACTIVITY_BADGE[a.type] ?? { variant: "neutral" as const, label: a.type.toUpperCase() };
+                return (
+                  <Link
+                    key={i}
+                    to={a.href}
+                    className="group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-bg3"
                   >
-                    {ACTIVITY_LABELS[a.type] || a.type.toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-text group-hover:text-lime">
-                        {a.event}
-                      </p>
-                      <span className="flex-shrink-0 text-[10px] text-muted">{a.time}</span>
+                    <Badge variant={badge.variant} size="xs" className="mt-0.5">
+                      {badge.label}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-text group-hover:text-lime">
+                          {a.event}
+                        </p>
+                        <span className="flex-shrink-0 text-[10px] text-muted">{a.time}</span>
+                      </div>
+                      <p className="truncate text-[10px] text-muted">{a.detail}</p>
                     </div>
-                    <p className="truncate text-[10px] text-muted">{a.detail}</p>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
             <Link
               to="/admin/moderation"
@@ -511,9 +429,7 @@ export default function AdminPage() {
           {/* Top Clubs */}
           <div className="glass-card overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-text">
-                Top kluby (przychód)
-              </h2>
+              <h2 className="text-sm font-semibold text-text">Top kluby (przychód)</h2>
               <Link
                 to="/admin/clubs"
                 className="text-[10px] text-muted transition-colors hover:text-lime"
@@ -542,9 +458,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs text-lime">
-                      {club.revenue}
-                    </span>
+                    <span className="font-mono text-xs text-lime">{club.revenue}</span>
                     <ChevronRight className="h-3.5 w-3.5 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
                   </div>
                 </Link>
