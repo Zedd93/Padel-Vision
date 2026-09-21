@@ -189,7 +189,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"email\": \"{{ _.test_email }}\",\n  \"password\": \"{{ _.test_password }}\"\n}"
+        "text": "{\n  \"email\": \"{% response 'body', 'req_auth_register', '$.data.user.email', 'never' %}\",\n  \"password\": \"{{ _.test_password }}\"\n}"
       }
     },
     {
