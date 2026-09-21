@@ -15,17 +15,13 @@ import {
   Gauge,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import type { StreamMarker } from "./types";
+
+export type { StreamMarker };
 
 /* ─── Types ────────────────────────────────────── */
 
-export interface StreamMarker {
-  time: number; // seconds from stream start
-  type: "ace" | "break" | "match_point" | "golden_point" | "set_end";
-  label: string;
-  color: string;
-}
-
-interface VideoPlayerProps {
+interface HlsPlayerProps {
   hlsUrl: string;
   isLive: boolean;
   poster?: string;
@@ -50,7 +46,7 @@ const DVR_MAX_BUFFER = 300; // 5 minutes max DVR
 
 /* ─── Component ────────────────────────────────── */
 
-export function VideoPlayer({
+export function HlsPlayer({
   hlsUrl,
   isLive,
   poster,
@@ -58,7 +54,7 @@ export function VideoPlayer({
   muted: initialMuted = false,
   markers = [],
   onClipRequest,
-}: VideoPlayerProps) {
+}: HlsPlayerProps) {
   const isMp4 = hlsUrl.endsWith(".mp4") || hlsUrl.endsWith(".webm");
 
   const videoRef = useRef<HTMLVideoElement>(null);
