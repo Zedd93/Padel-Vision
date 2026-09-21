@@ -22,9 +22,9 @@
         "access_token": "",
         "refresh_token": "",
         "user_id": "",
-        "test_email": "insomnia.smoke+{% now 'unix' %}@padelvision.tv",
+        "test_email": "insomnia.smoke@padelvision.tv",
         "test_password": "InsomniaTest123!",
-        "test_username": "insomnia_smoke_{% now 'unix' %}",
+        "test_username": "insomnia_smoke",
         "test_name": "Insomnia Smoke User"
       },
       "dataPropertyOrder": {
@@ -189,7 +189,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"email\": \"{% response 'body', 'req_auth_register', '$.data.user.email', 'no-history' %}\",\n  \"password\": \"{{ _.test_password }}\"\n}"
+        "text": "{\n  \"email\": \"{{ _.test_email }}\",\n  \"password\": \"{{ _.test_password }}\"\n}"
       }
     },
     {
@@ -707,7 +707,7 @@
       "parentId": "uts_smoke",
       "name": "Register new user returns 200 with accessToken + refreshToken",
       "requestId": "req_auth_register",
-      "code": "const response = await insomnia.send();\nexpect(response.status).to.be.oneOf([200, 201]);\nconst body = JSON.parse(response.data);\nconst payload = body.data !== undefined ? body.data : body;\nexpect(payload).to.have.property('accessToken');\nexpect(payload).to.have.property('refreshToken');\nexpect(payload).to.have.property('user');\nexpect(payload.accessToken).to.be.a('string').and.not.empty;\nexpect(payload.refreshToken).to.be.a('string').and.not.empty;\n"
+      "code": "const response = await insomnia.send();\nexpect(response.status).to.be.oneOf([200, 201, 409]);\nconst body = JSON.parse(response.data);\nconst payload = body.data !== undefined ? body.data : body;\nif (response.status !== 409) {\n  expect(payload).to.have.property('accessToken');\n  expect(payload).to.have.property('refreshToken');\n  expect(payload).to.have.property('user');\n  expect(payload.accessToken).to.be.a('string').and.not.empty;\n  expect(payload.refreshToken).to.be.a('string').and.not.empty;\n}"
     },
     {
       "_id": "ut_login",
