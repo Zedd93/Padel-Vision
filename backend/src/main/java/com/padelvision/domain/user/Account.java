@@ -34,12 +34,10 @@ public class Account {
     @Column(name = "provider_account_id")
     private String providerAccountId;
 
-    @Lob
-    @Column(name = "refresh_token")
+    @Column(name = "refresh_token", length = 4096)
     private String refreshToken;
 
-    @Lob
-    @Column(name = "access_token")
+    @Column(name = "access_token", length = 4096)
     private String accessToken;
 
     @Column(name = "expires_at")
@@ -51,8 +49,7 @@ public class Account {
     @Column(name = "scope")
     private String scope;
 
-    @Lob
-    @Column(name = "id_token")
+    @Column(name = "id_token", length = 4096)
     private String idToken;
 
     @Column(name = "session_state")

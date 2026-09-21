@@ -35,7 +35,7 @@ public class Match {
     private Integer courtNumber;
 
     @Column(name = "round")
-    private String round;
+    private Integer round;
 
     @Column(name = "position")
     private Integer position;

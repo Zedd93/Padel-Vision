@@ -12,7 +12,7 @@ public class MatchResponse {
     private String id;
     private String tournamentId;
     private Integer courtNumber;
-    private String round;
+    private Integer round;
     private Integer position;
     private String team1Player1;
     private String team1Player2;

@@ -29,15 +29,13 @@ public class PlaytomicIntegration {
     @Column(name = "client_id")
     private String clientId;
 
-    @Lob
-    @Column(name = "client_secret")
+    @Column(name = "client_secret", length = 2048)
     private String clientSecret;
 
     @Column(name = "tenant_id")
     private String tenantId;
 
-    @Lob
-    @Column(name = "access_token")
+    @Column(name = "access_token", length = 4096)
     private String accessToken;
 
     @Column(name = "token_expires_at")
@@ -54,8 +52,7 @@ public class PlaytomicIntegration {
     @Column(name = "last_sync_status")
     private String lastSyncStatus = "pending";
 
-    @Lob
-    @Column(name = "last_sync_error")
+    @Column(name = "last_sync_error", length = 5000)
     private String lastSyncError;
 
     @CreationTimestamp
