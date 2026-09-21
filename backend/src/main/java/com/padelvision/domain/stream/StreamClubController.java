@@ -31,7 +31,7 @@ public class StreamClubController {
         Club club = clubService.getClubSettings(userId);
 
         Stream stream = streamService.startStream(club.getId(), request.getTitle(), request.getMatchId());
-        return ResponseEntity.ok(ApiResponse.ok(toStreamResponse(stream)));
+        return ResponseEntity.ok(ApiResponse.ok(StreamResponse.from(stream)));
     }
 
     @PostMapping("/{id}/stop")
@@ -56,24 +56,4 @@ public class StreamClubController {
         return auth.getName();
     }
 
-    private StreamResponse toStreamResponse(Stream stream) {
-        return StreamResponse.builder()
-                .id(stream.getId())
-                .clubId(stream.getClubId())
-                .title(stream.getTitle())
-                .description(stream.getDescription())
-                .status(stream.getStatus() != null ? stream.getStatus().name() : null)
-                .hlsUrl(stream.getHlsUrl())
-                .thumbnailUrl(stream.getThumbnailUrl())
-                .viewerCount(stream.getViewerCount())
-                .peakViewers(stream.getPeakViewers())
-                .startedAt(stream.getStartedAt())
-                .endedAt(stream.getEndedAt())
-                .createdAt(stream.getCreatedAt())
-                .clubName(stream.getClub() != null ? stream.getClub().getName() : null)
-                .clubSlug(stream.getClub() != null ? stream.getClub().getSlug() : null)
-                .clubCity(stream.getClub() != null ? stream.getClub().getCity() : null)
-                .clubLogo(stream.getClub() != null ? stream.getClub().getLogo() : null)
-                .build();
-    }
 }

@@ -4,11 +4,12 @@ import com.padelvision.domain.club.Club;
 import com.padelvision.domain.club.ClubRepository;
 import com.padelvision.domain.match.Match;
 import com.padelvision.domain.match.MatchRepository;
+import com.padelvision.integration.youtube.YouTubeLiveService;
+import com.padelvision.integration.youtube.YouTubeProperties;
 import com.padelvision.shared.enums.StreamStatus;
 import com.padelvision.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,9 +25,8 @@ public class StreamService {
     private final StreamRepository streamRepository;
     private final ClubRepository clubRepository;
     private final MatchRepository matchRepository;
-
-    @Value("${padelvision.hls.base-url:http://localhost:8000}")
-    private String hlsBaseUrl;
+    private final YouTubeLiveService youTubeLiveService;
+    private final YouTubeProperties youTubeProperties;
 
     /**
      * Get all live streams with club info (ordered by viewer count desc).
@@ -66,7 +66,9 @@ public class StreamService {
     }
 
     /**
-     * Create a stream entry (status OFFLINE until RTMP connects).
+     * Tworzy transmisj\u0119 na kanale YouTube klubu i zapisuje j\u0105 jako OFFLINE.
+     * Na \u017cywo wchodzi sama, gdy OBS zacznie nadawa\u0107 \u2014 wykrywa to
+     * {@code YouTubeStatusPoller}.
      * Mirrors: POST /api/club/stream/start
      */
     @Transactional
@@ -74,12 +76,21 @@ public class StreamService {
         Club club = clubRepository.findById(clubId)
                 .orElseThrow(() -> new ResourceNotFoundException("Club", "id", clubId));
 
+        String streamTitle = title != null ? title : club.getName() + " \u2014 Na \u017cywo";
+        String broadcastId = youTubeLiveService.createBroadcast(clubId, streamTitle, club.getDescription());
+
         Stream.StreamBuilder builder = Stream.builder()
                 .clubId(clubId)
                 .club(club)
-                .title(title != null ? title : club.getName() + " \u2014 Na \u017cywo")
+                .title(streamTitle)
                 .status(StreamStatus.OFFLINE)
-                .hlsUrl(hlsBaseUrl + "/" + club.getStreamKey() + "/master.m3u8");
+                .youtubeBroadcastId(broadcastId)
+                // dla transmisji na \u017cywo id broadcastu jest zarazem id filmu
+                .youtubeVideoId(broadcastId)
+                .youtubePrivacy(youTubeProperties.getDefaultPrivacy())
+                .latencyPreference(youTubeProperties.getDefaultLatency())
+                // miniatura generowana przez YouTube \u2014 zero koszt\u00f3w po naszej stronie
+                .thumbnailUrl("https://i.ytimg.com/vi/" + broadcastId + "/maxresdefault.jpg");
 
         if (matchId != null) {
             Match match = matchRepository.findById(matchId).orElse(null);
@@ -91,27 +102,32 @@ public class StreamService {
         Stream stream = builder.build();
         stream = streamRepository.save(stream);
 
-        log.info("Stream created for club {} (stream {}), awaiting RTMP", club.getName(), stream.getId());
+        log.info("Stream created for club {} (stream {}, broadcast {}), awaiting OBS",
+                club.getName(), stream.getId(), broadcastId);
         return stream;
     }
 
     /**
-     * Stop all live streams for a club.
+     * Kończy transmisje klubu — także te, które czekają jeszcze na sygnał
+     * z OBS, żeby nie zostawiać w YouTube wiszących broadcastów.
      * Mirrors: POST /api/club/stream/stop
      */
     @Transactional
     public int stopStream(String clubId) {
-        List<Stream> liveStreams = streamRepository.findByClubIdAndStatus(clubId, StreamStatus.LIVE);
+        List<Stream> active =
+                streamRepository.findByClubIdAndEndedAtIsNullAndYoutubeBroadcastIdIsNotNull(clubId);
         Instant now = Instant.now();
 
-        for (Stream stream : liveStreams) {
+        for (Stream stream : active) {
+            youTubeLiveService.endBroadcast(clubId, stream.getYoutubeBroadcastId());
             stream.setStatus(StreamStatus.OFFLINE);
             stream.setEndedAt(now);
+            stream.setViewerCount(0);
         }
 
-        streamRepository.saveAll(liveStreams);
-        log.info("Stopped {} live stream(s) for club {}", liveStreams.size(), clubId);
-        return liveStreams.size();
+        streamRepository.saveAll(active);
+        log.info("Stopped {} stream(s) for club {}", active.size(), clubId);
+        return active.size();
     }
 
     /**
@@ -134,47 +150,4 @@ public class StreamService {
         log.debug("Score updated for stream {}", streamId);
     }
 
-    /**
-     * Handle RTMP publish event: find club by stream key, create LIVE stream.
-     * Mirrors: POST /api/webhooks/rtmp (event=publish)
-     */
-    @Transactional
-    public Stream handleRtmpPublish(String streamKey) {
-        Club club = clubRepository.findByStreamKey(streamKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Club", "streamKey", streamKey));
-
-        Stream stream = Stream.builder()
-                .clubId(club.getId())
-                .club(club)
-                .title(club.getName() + " \u2014 Na \u017cywo")
-                .status(StreamStatus.LIVE)
-                .hlsUrl(hlsBaseUrl + "/" + streamKey + "/master.m3u8")
-                .startedAt(Instant.now())
-                .build();
-
-        stream = streamRepository.save(stream);
-        log.info("[RTMP] Stream LIVE: {} ({})", club.getName(), stream.getId());
-        return stream;
-    }
-
-    /**
-     * Handle RTMP unpublish event: set all live streams for club to OFFLINE.
-     * Mirrors: POST /api/webhooks/rtmp (event=unpublish)
-     */
-    @Transactional
-    public void handleRtmpUnpublish(String streamKey) {
-        Club club = clubRepository.findByStreamKey(streamKey)
-                .orElseThrow(() -> new ResourceNotFoundException("Club", "streamKey", streamKey));
-
-        List<Stream> liveStreams = streamRepository.findByClubIdAndStatus(club.getId(), StreamStatus.LIVE);
-        Instant now = Instant.now();
-
-        for (Stream stream : liveStreams) {
-            stream.setStatus(StreamStatus.OFFLINE);
-            stream.setEndedAt(now);
-        }
-
-        streamRepository.saveAll(liveStreams);
-        log.info("[RTMP] Stream OFFLINE: {} ({} streams)", club.getName(), liveStreams.size());
-    }
 }

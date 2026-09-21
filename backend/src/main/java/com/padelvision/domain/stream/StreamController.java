@@ -20,7 +20,7 @@ public class StreamController {
     @GetMapping("/live")
     public ResponseEntity<ApiResponse<List<StreamResponse>>> getLiveStreams() {
         List<StreamResponse> streams = streamService.getLiveStreams().stream()
-                .map(this::toStreamResponse)
+                .map(StreamResponse::from)
                 .toList();
         return ResponseEntity.ok(ApiResponse.ok(streams));
     }
@@ -28,7 +28,7 @@ public class StreamController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<StreamResponse>> getStreamById(@PathVariable String id) {
         Stream stream = streamService.getStreamById(id);
-        return ResponseEntity.ok(ApiResponse.ok(toStreamResponse(stream)));
+        return ResponseEntity.ok(ApiResponse.ok(StreamResponse.from(stream)));
     }
 
     @GetMapping("/archived")
@@ -41,24 +41,4 @@ public class StreamController {
         return ResponseEntity.ok(ApiResponse.ok(streams));
     }
 
-    private StreamResponse toStreamResponse(Stream stream) {
-        return StreamResponse.builder()
-                .id(stream.getId())
-                .clubId(stream.getClubId())
-                .title(stream.getTitle())
-                .description(stream.getDescription())
-                .status(stream.getStatus() != null ? stream.getStatus().name() : null)
-                .hlsUrl(stream.getHlsUrl())
-                .thumbnailUrl(stream.getThumbnailUrl())
-                .viewerCount(stream.getViewerCount())
-                .peakViewers(stream.getPeakViewers())
-                .startedAt(stream.getStartedAt())
-                .endedAt(stream.getEndedAt())
-                .createdAt(stream.getCreatedAt())
-                .clubName(stream.getClub() != null ? stream.getClub().getName() : null)
-                .clubSlug(stream.getClub() != null ? stream.getClub().getSlug() : null)
-                .clubCity(stream.getClub() != null ? stream.getClub().getCity() : null)
-                .clubLogo(stream.getClub() != null ? stream.getClub().getLogo() : null)
-                .build();
-    }
 }

@@ -58,10 +58,6 @@ aws:
     bucket: ${AWS_S3_BUCKET:padelvision-media-dev}
     region: ${AWS_REGION:eu-central-1}
 
-# RTMP — wycofywane w Fazie 2 migracji na YouTube (docs/YOUTUBE_MIGRATION_PLAN.md)
-rtmp:
-  server-url: ${RTMP_SERVER_URL:rtmps://stream.padelvision.app/live}
-
 # YouTube Live — konfiguracja Fazy 0, użyta od Fazy 1
 # Setup: docs/YOUTUBE_SETUP.md
 youtube:

@@ -20,4 +20,13 @@ public interface StreamRepository extends JpaRepository<Stream, String> {
     Page<Stream> findByStatusIn(List<StreamStatus> statuses, Pageable pageable);
 
     long countByStatus(StreamStatus status);
+
+    /**
+     * Transmisje, których stan trzeba jeszcze odpytać w YouTube: mają broadcast,
+     * a nie mają jeszcze daty zakończenia. Ustawienie {@code endedAt} wyłącza
+     * je z pollingu, więc zakończone transmisje nie zużywają quoty.
+     */
+    List<Stream> findByYoutubeBroadcastIdIsNotNullAndEndedAtIsNullAndStatusIn(List<StreamStatus> statuses);
+
+    List<Stream> findByClubIdAndEndedAtIsNullAndYoutubeBroadcastIdIsNotNull(String clubId);
 }
