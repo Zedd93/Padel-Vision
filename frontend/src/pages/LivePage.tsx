@@ -3,6 +3,10 @@ import { createPortal } from "react-dom";
 import { useParams } from "react-router-dom";
 import { Users, Heart, Share2, Sparkles, X, Send, Copy, Check, Link2 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useQuery } from "@tanstack/react-query";
+import { StreamPlayer } from "@/components/stream/StreamPlayer";
+import { streamsApi } from "@/api/streams";
+import type { StreamMarker } from "@/components/stream/types";
 import { io } from "socket.io-client";
 
 /* ─── Types ─── */
@@ -18,12 +22,6 @@ interface ScoreData {
   elapsedTime: string;
 }
 
-interface StreamMarker {
-  time: number;
-  type: string;
-  label: string;
-  color: string;
-}
 
 /* ─── Demo data ─── */
 
@@ -168,7 +166,16 @@ export default function LivePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const hlsUrl = "/test.mp4";
+  // Dane transmisji z API; demo ponizej zostaje jako fallback, dopoki
+  // reszta strony (wynik, czat, statystyki) nie jest podpieta pod backend.
+  const { data: stream } = useQuery({
+    queryKey: ["stream", streamId],
+    // axios zwraca AxiosResponse, a backend opakowuje wynik w ApiResponse
+    queryFn: async () => (await streamsApi.getById(streamId!)).data.data,
+    enabled: Boolean(streamId),
+    retry: false,
+  });
+
   const tabs = ["O meczu", "Statystyki", "Bracket"];
 
   return (
@@ -177,16 +184,13 @@ export default function LivePage() {
       <div className="flex flex-1 flex-col overflow-y-auto">
         {/* Video Player */}
         <div className="relative w-full flex-shrink-0">
-          <div className="relative aspect-video bg-black">
-            <video
-              src={hlsUrl}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <StreamPlayer
+            youtubeVideoId={stream?.youtubeVideoId}
+            hlsUrl={stream?.hlsUrl}
+            isLive={stream?.status === "LIVE"}
+            poster={stream?.thumbnailUrl ?? undefined}
+            markers={markers}
+          />
 
           {/* Score Overlay */}
           <div className="absolute right-4 top-4 z-20 rounded-lg bg-black/70 px-3 py-2 backdrop-blur-md">

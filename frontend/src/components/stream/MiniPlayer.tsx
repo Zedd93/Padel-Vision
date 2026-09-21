@@ -13,7 +13,10 @@ import { cn } from "@/utils/cn";
 /* ─── Types ────────────────────────────────────── */
 
 interface MiniPlayerProps {
-  hlsUrl: string;
+  /** Identyfikator YouTube — ma pierwszeństwo nad hlsUrl. */
+  youtubeVideoId?: string | null;
+  /** @deprecated wycofywane wraz z migracją na YouTube */
+  hlsUrl?: string | null;
   title: string;
   clubName: string;
   viewers: number;
@@ -28,6 +31,7 @@ interface MiniPlayerProps {
 /* ─── Component ────────────────────────────────── */
 
 export function MiniPlayer({
+  youtubeVideoId,
   hlsUrl,
   title,
   clubName,
@@ -46,7 +50,7 @@ export function MiniPlayer({
   // Initialize HLS
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !hlsUrl) return;
+    if (!video || !hlsUrl || youtubeVideoId) return;
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -76,7 +80,7 @@ export function MiniPlayer({
       video.src = hlsUrl;
       video.play();
     }
-  }, [hlsUrl]);
+  }, [hlsUrl, youtubeVideoId]);
 
   // Sync muted state with isActive
   useEffect(() => {
@@ -88,12 +92,12 @@ export function MiniPlayer({
 
   const toggleMute = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    const next = !muted;
+    setMuted(next);
     const video = videoRef.current;
-    if (!video) return;
-    video.muted = !video.muted;
-    setMuted(video.muted);
-    if (!video.muted) onActivate?.();
-  }, [onActivate]);
+    if (video) video.muted = next;
+    if (!next) onActivate?.();
+  }, [muted, onActivate]);
 
   return (
     <div
@@ -107,12 +111,26 @@ export function MiniPlayer({
     >
       {/* Video */}
       <div className="aspect-video">
-        <video
-          ref={videoRef}
-          className="h-full w-full object-cover"
-          playsInline
-          muted={muted}
-        />
+        {youtubeVideoId ? (
+          // Kafelek Multiview jest tylko podgladem - sterowanie dzwiekiem idzie
+          // przez przeladowanie iframe'a z innym parametrem mute, bo pelne
+          // IFrame API na kilkunastu kafelkach naraz jest zbyt ciezkie.
+          <iframe
+            key={`${youtubeVideoId}-${muted ? "muted" : "audio"}`}
+            className="pointer-events-none h-full w-full"
+            src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=0&rel=0&playsinline=1&modestbranding=1`}
+            title={title}
+            allow="autoplay; encrypted-media; picture-in-picture"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            className="h-full w-full object-cover"
+            playsInline
+            muted={muted}
+          />
+        )}
       </div>
 
       {/* Live badge + viewers */}

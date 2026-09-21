@@ -7,7 +7,13 @@ export interface Stream {
   title: string;
   description: string | null;
   status: 'LIVE' | 'OFFLINE' | 'VOD';
+  /** @deprecated wycofywane wraz z migracją na YouTube */
   hlsUrl: string | null;
+  youtubeVideoId: string | null;
+  /** Gotowy adres do osadzenia (https://www.youtube.com/embed/...) */
+  embedUrl: string | null;
+  /** normal | low | ultraLow — potrzebne do kompensacji opóźnienia overlaya */
+  latencyPreference: string | null;
   thumbnailUrl: string | null;
   viewerCount: number;
   peakViewers: number;
