@@ -45,8 +45,29 @@ public class Stream {
     @Column(name = "status", nullable = false)
     private StreamStatus status = StreamStatus.OFFLINE;
 
+    /**
+     * @deprecated Pozostałość po własnym pipelinie RTMP/HLS. Kolumna zostaje
+     * nullable na czas migracji na YouTube — usunięcie w V12
+     * (docs/YOUTUBE_MIGRATION_PLAN.md §9).
+     */
+    @Deprecated
     @Column(name = "hls_url")
     private String hlsUrl;
+
+    /** Identyfikator filmu na YouTube — ten sam co broadcast id. */
+    @Column(name = "youtube_video_id", length = 24)
+    private String youtubeVideoId;
+
+    @Column(name = "youtube_broadcast_id", length = 24)
+    private String youtubeBroadcastId;
+
+    /** unlisted | public | private */
+    @Column(name = "youtube_privacy", length = 16)
+    private String youtubePrivacy;
+
+    /** normal | low | ultraLow */
+    @Column(name = "latency_preference", length = 16)
+    private String latencyPreference;
 
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;

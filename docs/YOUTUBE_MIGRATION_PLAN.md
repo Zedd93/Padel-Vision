@@ -170,17 +170,31 @@ Domyślny limit: **10 000 jednostek/dobę** na projekt Google Cloud.
 | `liveStreams.list` (do 50 ID naraz) | **1** | polling |
 | `liveChatMessages.list` | 5 | **nie używamy** |
 
-Budżet dobowy przy poller co 60 s, batchowanym po ID:
-`1440 × 2 = 2 880` jednostek na cały polling (niezależnie od liczby klubów)
-`+ 100` na transmisję → **~70 transmisji/dobę** w domyślnej quocie. Z zapasem
-na start.
+**Korekta względem pierwotnego szacunku (Faza 2):** batchowanie nie działa
+w poprzek klubów. Każde `liveBroadcasts.list` wymaga tokenu OAuth właściciela
+kanału, więc jedno zapytanie obejmuje transmisje **jednego** klubu, nie
+wszystkich. Gdybyśmy odpytywali każdy klub co minutę bez przerwy, 10 klubów
+zjadłoby 14 400 jednostek na dobę — ponad limit.
+
+Rozwiązanie: **poller odpytuje wyłącznie transmisje z `ended_at IS NULL`**.
+Klub, który akurat nie nadaje, nie kosztuje nic. Realny budżet:
+
+| Pozycja | Koszt |
+|---|---|
+| Polling transmisji na żywo | 60 jednostek za każdą godzinę nadawania |
+| Utworzenie transmisji (insert + bind) | 100 |
+| Stały strumień RTMP klubu | 50, raz na klub |
+| Ręczne zakończenie (transition) | 50 |
+
+Przy 40 h nadawania i 20 transmisjach miesięcznie: `2 400 + 2 000 ≈ 4 400`
+jednostek **na miesiąc**, przy limicie 10 000 **na dobę**. Zapas jest duży.
 
 Dwie rzeczy, które trzeba zrobić dobrze od razu:
-- **Batchowanie ID w pollerze.** Jedno `liveBroadcasts.list?id=a,b,c,…` (do 50)
-  kosztuje 1 jednostkę. Odpytywanie po jednym streamie zabija quotę.
-- **`QuotaGuard`** — licznik zużycia w Redis z dziennym resetem, który odmawia
-  wywołań powyżej budżetu zamiast dostać HTTP 403 `quotaExceeded` w środku
-  transmisji.
+- **Batchowanie ID w obrębie klubu.** Jedno `liveBroadcasts.list?id=a,b,c,…`
+  (do 50) kosztuje 1 jednostkę. Odpytywanie po jednej transmisji zabija quotę.
+- **`QuotaGuard`** — licznik zużycia w Redis, zerowany o północy **czasu
+  pacyficznego** (tak resetuje Google), który odmawia wywołań powyżej budżetu
+  zamiast dostać HTTP 403 `quotaExceeded` w środku transmisji.
 
 **Czat YouTube jest niewykonalny w quocie**: 2 h transmisji przy pollingu co 5 s
 to ~1440 wywołań × 5 = **7 200 jednostek na jedną transmisję**. Dlatego zostajemy
