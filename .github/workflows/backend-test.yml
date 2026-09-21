@@ -132,8 +132,18 @@ jobs:
           tail -100 backend/backend.log || true
           exit 1
 
+      # Binarka z releasów Kong/insomnia zamiast npm: pakiet insomnia-inso
+      # zatrzymał się na 3.6.0 i ciągnie natywny node-libcurl, dla którego
+      # nie ma już prebuiltów pod aktualne ABI Node'a.
       - name: Install Inso CLI
-        run: npm install -g insomnia-inso@3.6.0
+        env:
+          INSO_VERSION: "13.2.0"
+        run: |
+          curl -fsSL -o /tmp/inso.tar.xz \
+            "https://github.com/Kong/insomnia/releases/download/core%40${INSO_VERSION}/inso-linux-x64-${INSO_VERSION}.tar.xz"
+          mkdir -p /tmp/inso && tar -xJf /tmp/inso.tar.xz -C /tmp/inso
+          find /tmp/inso -maxdepth 2 -name inso -type f -exec chmod +x {} \; -exec dirname {} \; \
+            | head -1 >> "$GITHUB_PATH"
 
       - name: Run Insomnia smoke suite
         working-directory: backend
