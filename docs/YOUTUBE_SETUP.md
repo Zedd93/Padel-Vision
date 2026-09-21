@@ -93,8 +93,10 @@ potrzebne w trybie testowym — uzupełnia się je dopiero przed weryfikacją.
   https://developers.google.com/oauthplayground
   ```
 
-  Trzeci jest potrzebny **tylko do kroku 4** (wygenerowanie pierwszego refresh
-  tokenu bez gotowego backendu). **Usuń go po zakończeniu Fazy 0.**
+  Trzeci służy do generowania refresh tokenów bez uruchomionego backendu
+  (krok 4). **Zostaw go, dopóki własny flow OAuth nie zadziała end-to-end
+  (Faza 3)** — do tego czasu jest jedynym sposobem na odnowienie tokenu.
+  Usuń dopiero potem.
 
 - [ ] **Utwórz** → w okienku skopiuj **Identyfikator klienta** i **Tajny klucz klienta**
       do menedżera haseł. Tajny klucz jest w całości widoczny **tylko w tym okienku** —
@@ -213,7 +215,7 @@ Frontend (`frontend/.env`, Vercel):
 - [ ] `./scripts/youtube-check.sh` kończy się zielonym `✓` i pokazuje kanał testowy
 - [ ] `liveStreams: OK` w wyjściu skryptu (to potwierdza, że 24 h minęło)
 - [ ] `YOUTUBE_TOKEN_ENC_KEY` w Secrets Manager + backup
-- [ ] Redirect URI `oauthplayground` **usunięty** z klienta OAuth
+- [ ] Redirect URI `oauthplayground` zostaje do Fazy 3, potem do usunięcia
 - [ ] Wniosek weryfikacyjny do Google złożony **albo** świadomie odłożony
       z wiedzą, że refresh tokeny wygasają co 7 dni w trybie testowym
 

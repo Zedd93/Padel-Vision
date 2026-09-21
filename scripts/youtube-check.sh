@@ -157,4 +157,4 @@ green "════════════════════════�
 echo
 dim "Pozostałe kroki z docs/YOUTUBE_SETUP.md:"
 dim "  • YOUTUBE_TOKEN_ENC_KEY w Secrets Manager + backup"
-dim "  • usunięcie redirect URI oauthplayground z klienta OAuth"
+dim "  • redirect URI oauthplayground zostaje do Fazy 3, potem do usunięcia"
