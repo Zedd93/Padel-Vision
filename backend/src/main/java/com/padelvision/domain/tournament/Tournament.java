@@ -60,8 +60,7 @@ public class Tournament {
     @Column(name = "entry_fee")
     private Double entryFee;
 
-    @Lob
-    @Column(name = "prizes")
+    @Column(name = "prizes", length = 5000)
     private String prizes;
 
     @Builder.Default

@@ -37,8 +37,7 @@ public class Stream {
     @Column(name = "title")
     private String title;
 
-    @Lob
-    @Column(name = "description")
+    @Column(name = "description", length = 10000)
     private String description;
 
     @Builder.Default

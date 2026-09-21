@@ -53,8 +53,7 @@ public class Club {
     @Column(name = "nip")
     private String nip;
 
-    @Lob
-    @Column(name = "description")
+    @Column(name = "description", length = 10000)
     private String description;
 
     @Column(name = "logo")
