@@ -1,9 +1,7 @@
 import { useState } from "react";
 import {
   Radio,
-  Copy,
-  Eye,
-  EyeOff,
+  X,
   Users,
   TrendingUp,
   Coins,
@@ -21,12 +19,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useSearchParams } from "react-router-dom";
+import { YouTubeConnectionCard } from "@/components/studio/YouTubeConnectionCard";
 
 // Mock club data
 const MOCK_CLUB = {
   name: "Racket Club Katowice",
-  streamKey: "rck_live_a1b2c3d4e5f6",
-  rtmpUrl: "rtmp://ingest.padelvision.tv/live",
 };
 
 // ── Padel Score Types & Logic ────────────────────────────────
@@ -135,7 +133,6 @@ function gameWon(state: PadelMatchState, team: 1 | 2): PadelMatchState {
 
 export default function StudioPage() {
   const [isLive, setIsLive] = useState(false);
-  const [showKey, setShowKey] = useState(false);
   const [title, setTitle] = useState("Silesia Open 2025 — Finał OPEN A");
 
   const apiAction = async (action: string, value?: unknown) => {
@@ -218,8 +215,48 @@ export default function StudioPage() {
   const isMatchFinished = team1SetsWon === 2 || team2SetsWon === 2;
   const pointsDisplay = getGamePointLabel(match.points);
 
+  // Backend po callbacku OAuth przekierowuje tutaj z wynikiem w query
+  const [searchParams, setSearchParams] = useSearchParams();
+  const youtubeResult = searchParams.get("youtube");
+  const youtubeDetail = searchParams.get("detail");
+
+  const dismissYoutubeBanner = () => {
+    searchParams.delete("youtube");
+    searchParams.delete("detail");
+    setSearchParams(searchParams, { replace: true });
+  };
+
   return (
     <div className="p-6">
+      {youtubeResult && (
+        <div
+          className={cn(
+            "mb-4 flex items-start gap-2 rounded-lg px-4 py-3 text-sm",
+            youtubeResult === "connected"
+              ? "bg-lime/10 text-lime"
+              : "bg-orange/10 text-orange"
+          )}
+        >
+          {youtubeResult === "connected" ? (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          )}
+          <div className="flex-1">
+            <p className="font-medium">
+              {youtubeResult === "connected"
+                ? `Kanal ${youtubeDetail ?? "YouTube"} zostal polaczony`
+                : "Nie udalo sie polaczyc kanalu YouTube"}
+            </p>
+            {youtubeResult !== "connected" && youtubeDetail && (
+              <p className="mt-0.5 text-xs opacity-80">{youtubeDetail}</p>
+            )}
+          </div>
+          <button onClick={dismissYoutubeBanner} className="opacity-60 hover:opacity-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-display text-2xl">Studio</h1>
         <div className="flex items-center gap-3">
@@ -286,33 +323,7 @@ export default function StudioPage() {
             </div>
           </div>
 
-          {/* RTMP Configuration */}
-          <div className="glass-card p-4">
-            <h3 className="mb-3 text-sm font-semibold text-text">Konfiguracja RTMP</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs text-muted">URL Serwera</label>
-                <div className="flex gap-2">
-                  <input type="text" readOnly value={MOCK_CLUB.rtmpUrl} className="flex-1 rounded-lg border border-border bg-bg3 px-3 py-2 font-mono text-sm text-text" />
-                  <button onClick={() => navigator.clipboard.writeText(MOCK_CLUB.rtmpUrl)} className="rounded-lg border border-border px-3 py-2 text-muted transition-colors hover:border-lime hover:text-lime">
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-muted">Klucz Streamu</label>
-                <div className="flex gap-2">
-                  <input type={showKey ? "text" : "password"} readOnly value={MOCK_CLUB.streamKey} className="flex-1 rounded-lg border border-border bg-bg3 px-3 py-2 font-mono text-sm text-text" />
-                  <button onClick={() => setShowKey(!showKey)} className="rounded-lg border border-border px-3 py-2 text-muted transition-colors hover:border-lime hover:text-lime">
-                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                  <button onClick={() => navigator.clipboard.writeText(MOCK_CLUB.streamKey)} className="rounded-lg border border-border px-3 py-2 text-muted transition-colors hover:border-lime hover:text-lime">
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <YouTubeConnectionCard />
         </div>
 
         {/* Right: Stats + Score + Multistream */}
