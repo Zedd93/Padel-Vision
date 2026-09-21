@@ -14,6 +14,8 @@ interface StreamPlayerProps {
   muted?: boolean;
   markers?: StreamMarker[];
   onClipRequest?: (currentTime: number) => void;
+  /** Pozycja odtwarzania w sekundach — do pomiaru opoznienia transmisji. */
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function StreamPlayer({
   muted = true,
   markers = [],
   onClipRequest,
+  onTimeUpdate,
 }: StreamPlayerProps) {
   if (youtubeVideoId) {
     return (
@@ -42,6 +45,7 @@ export function StreamPlayer({
         muted={muted}
         markers={markers}
         onClipRequest={onClipRequest}
+        onTimeUpdate={onTimeUpdate}
       />
     );
   }
@@ -56,6 +60,7 @@ export function StreamPlayer({
         muted={muted}
         markers={markers}
         onClipRequest={onClipRequest}
+        onTimeUpdate={onTimeUpdate}
       />
     );
   }

@@ -29,6 +29,8 @@ interface HlsPlayerProps {
   muted?: boolean;
   markers?: StreamMarker[];
   onClipRequest?: (currentTime: number) => void;
+  /** Pozycja odtwarzania w sekundach — do pomiaru opoznienia transmisji. */
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
 /* ─── Helpers ──────────────────────────────────── */
@@ -54,6 +56,7 @@ export function HlsPlayer({
   muted: initialMuted = false,
   markers = [],
   onClipRequest,
+  onTimeUpdate,
 }: HlsPlayerProps) {
   const isMp4 = hlsUrl.endsWith(".mp4") || hlsUrl.endsWith(".webm");
 
@@ -171,6 +174,8 @@ export function HlsPlayer({
 
   // Cancel replay helper (defined early so togglePlay can use it)
   const replayReturnTimeRef = useRef<number | null>(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
 
   // Video events (play, pause, buffering, time updates)
   useEffect(() => {
@@ -187,6 +192,7 @@ export function HlsPlayer({
       if (isSeeking) return;
       setCurrentTime(video.currentTime);
       setDuration(video.duration || 0);
+      onTimeUpdateRef.current?.(video.currentTime);
 
       // Update buffered end
       if (video.buffered.length > 0) {

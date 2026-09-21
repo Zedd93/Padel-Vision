@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useLatencyCompensatedEvents } from '@/hooks/useLatencyCompensatedEvents';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/utils/cn';
 
@@ -13,9 +14,15 @@ interface ChatMessage {
 
 interface ChatPanelProps {
   streamId: string;
+  /**
+   * O ile opoznic cudze wiadomosci, zeby reakcje nie wyprzedzaly obrazu.
+   * Wlasne wiadomosci pokazujemy od razu - czekanie 20 s na wlasny wpis
+   * wygladaloby jak zepsuty czat.
+   */
+  delayMs?: number;
 }
 
-export default function ChatPanel({ streamId }: ChatPanelProps) {
+export default function ChatPanel({ streamId, delayMs = 0 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -27,6 +34,15 @@ export default function ChatPanel({ streamId }: ChatPanelProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  const appendMessage = useCallback((message: ChatMessage) => {
+    setMessages((prev) => [...prev, message]);
+  }, []);
+
+  const { push: pushMessage } = useLatencyCompensatedEvents<ChatMessage>(
+    delayMs,
+    appendMessage
+  );
+
   useEffect(() => {
     if (!connected) return;
 
@@ -35,7 +51,12 @@ export default function ChatPanel({ streamId }: ChatPanelProps) {
       (message) => {
         try {
           const data = JSON.parse(message.body) as ChatMessage;
-          setMessages((prev) => [...prev, data]);
+          // wlasne wiadomosci omijaja bufor, cudze czekaja na obraz
+          if (user && data.username === user.username) {
+            appendMessage(data);
+          } else {
+            pushMessage(data);
+          }
         } catch {
           // ignore malformed messages
         }
@@ -45,7 +66,7 @@ export default function ChatPanel({ streamId }: ChatPanelProps) {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [connected, streamId, subscribe]);
+  }, [connected, streamId, subscribe, user, appendMessage, pushMessage]);
 
   useEffect(() => {
     scrollToBottom();

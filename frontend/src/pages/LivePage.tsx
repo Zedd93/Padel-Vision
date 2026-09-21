@@ -7,6 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { StreamPlayer } from "@/components/stream/StreamPlayer";
 import { streamsApi } from "@/api/streams";
 import type { StreamMarker } from "@/components/stream/types";
+import { useStreamLatency } from "@/hooks/useStreamLatency";
+import { useLatencyCompensatedEvents } from "@/hooks/useLatencyCompensatedEvents";
 import { io } from "socket.io-client";
 
 /* ─── Types ─── */
@@ -120,6 +122,32 @@ export default function LivePage() {
   const [cheerMessage, setCheerMessage] = useState("");
   const [cheerSent, setCheerSent] = useState(false);
 
+  // Dane transmisji z API; demo ponizej zostaje jako fallback, dopoki
+  // reszta strony (wynik, czat, statystyki) nie jest podpieta pod backend.
+  const { data: stream } = useQuery({
+    queryKey: ["stream", streamId],
+    // axios zwraca AxiosResponse, a backend opakowuje wynik w ApiResponse
+    queryFn: async () => (await streamsApi.getById(streamId!)).data.data,
+    enabled: Boolean(streamId),
+    retry: false,
+  });
+
+  // Obraz z YouTube jest 15-30 s za rzeczywistoscia, a zdarzenia ze STOMP
+  // docieraja natychmiast. Bez bufora overlay zdradzalby punkt przed akcja.
+  const playerTimeRef = useRef<number | null>(null);
+  const { latencyMs } = useStreamLatency({
+    startedAt: stream?.startedAt,
+    latencyPreference: stream?.latencyPreference,
+    getPlayerTime: () => playerTimeRef.current,
+    enabled: stream?.status === "LIVE",
+  });
+
+  const { push: pushScore } = useLatencyCompensatedEvents<ScoreData>(latencyMs, setScore);
+  const { push: pushMarker } = useLatencyCompensatedEvents<StreamMarker>(
+    latencyMs,
+    (marker) => setMarkers((prev) => [...prev, marker])
+  );
+
   // Real-time score updates via Socket.io
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000";
@@ -130,7 +158,7 @@ export default function LivePage() {
     });
 
     socket.on("score:update", (data: ScoreData) => {
-      setScore(data);
+      pushScore(data);
     });
 
     socket.on("viewers:count", ({ count }: { count: number }) => {
@@ -138,13 +166,13 @@ export default function LivePage() {
     });
 
     socket.on("stream:marker", (marker: StreamMarker) => {
-      setMarkers((prev) => [...prev, marker]);
+      pushMarker(marker);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [streamId]);
+  }, [streamId, pushScore, pushMarker]);
 
   // Demo: simulate score changing every 15 seconds
   useEffect(() => {
@@ -166,16 +194,6 @@ export default function LivePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Dane transmisji z API; demo ponizej zostaje jako fallback, dopoki
-  // reszta strony (wynik, czat, statystyki) nie jest podpieta pod backend.
-  const { data: stream } = useQuery({
-    queryKey: ["stream", streamId],
-    // axios zwraca AxiosResponse, a backend opakowuje wynik w ApiResponse
-    queryFn: async () => (await streamsApi.getById(streamId!)).data.data,
-    enabled: Boolean(streamId),
-    retry: false,
-  });
-
   const tabs = ["O meczu", "Statystyki", "Bracket"];
 
   return (
@@ -190,6 +208,7 @@ export default function LivePage() {
             isLive={stream?.status === "LIVE"}
             poster={stream?.thumbnailUrl ?? undefined}
             markers={markers}
+            onTimeUpdate={(t) => (playerTimeRef.current = t)}
           />
 
           {/* Score Overlay */}

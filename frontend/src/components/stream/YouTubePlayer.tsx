@@ -30,6 +30,8 @@ interface YouTubePlayerProps {
   muted?: boolean;
   markers?: StreamMarker[];
   onClipRequest?: (currentTime: number) => void;
+  /** Pozycja odtwarzania w sekundach — do pomiaru opoznienia transmisji. */
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
 /* ─── Helpers ──────────────────────────────────── */
@@ -64,6 +66,7 @@ export function YouTubePlayer({
   muted: initialMuted = true,
   markers = [],
   onClipRequest,
+  onTimeUpdate,
 }: YouTubePlayerProps) {
   const { api, error: apiError } = useYouTubeIframeApi();
 
@@ -73,6 +76,8 @@ export function YouTubePlayer({
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekBarRef = useRef<HTMLDivElement>(null);
   const replayReturnTimeRef = useRef<number | null>(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
 
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -159,6 +164,7 @@ export function YouTubePlayer({
 
       setCurrentTime(time);
       setDuration(total);
+      onTimeUpdateRef.current?.(time);
       setBufferedRatio(player.getVideoLoadedFraction());
 
       if (replayReturnTimeRef.current !== null && time >= replayReturnTimeRef.current) {
