@@ -53,10 +53,19 @@ services:
       DATABASE_PASSWORD: ${DB_PASSWORD:-changeme}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-min-256-bit-key-for-hs512-padelvision-app}
-      ALLOWED_ORIGINS: http://localhost:3000,http://localhost
+      # HS512 wymaga klucza >= 512 bitow (64 znakow) - krotszy wywala rejestracje
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-for-hs512-which-needs-at-least-512-bits-of-entropy-padelvision}
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # YouTube Live - setup: docs/YOUTUBE_SETUP.md, test: docs/YOUTUBE_TEST.md
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI:-http://localhost:8080/api/club/youtube/callback}
+      YOUTUBE_TOKEN_ENC_KEY: ${YOUTUBE_TOKEN_ENC_KEY:-}
+      YOUTUBE_DEFAULT_PRIVACY: ${YOUTUBE_DEFAULT_PRIVACY:-unlisted}
+      YOUTUBE_DEFAULT_LATENCY: ${YOUTUBE_DEFAULT_LATENCY:-low}
+      YOUTUBE_POST_CONNECT_REDIRECT: ${YOUTUBE_POST_CONNECT_REDIRECT:-http://localhost:5173/studio}
     depends_on:
       postgres:
         condition: service_healthy

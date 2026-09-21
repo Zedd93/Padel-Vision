@@ -21,6 +21,8 @@ import {
 import { cn } from "@/utils/cn";
 import { useSearchParams } from "react-router-dom";
 import { YouTubeConnectionCard } from "@/components/studio/YouTubeConnectionCard";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { clubStreamApi } from "@/api/clubStream";
 
 // Mock club data
 const MOCK_CLUB = {
@@ -134,6 +136,7 @@ function gameWon(state: PadelMatchState, team: 1 | 2): PadelMatchState {
 export default function StudioPage() {
   const [isLive, setIsLive] = useState(false);
   const [title, setTitle] = useState("Silesia Open 2025 — Finał OPEN A");
+  const [description, setDescription] = useState("");
 
   const apiAction = async (action: string, value?: unknown) => {
     try {
@@ -215,6 +218,42 @@ export default function StudioPage() {
   const isMatchFinished = team1SetsWon === 2 || team2SetsWon === 2;
   const pointsDisplay = getGamePointLabel(match.points);
 
+  // Transmisja tworzona po stronie YouTube; adres RTMP pojawia sie w karcie
+  // polaczenia dopiero po pierwszym starcie, bo wtedy powstaje staly strumien.
+  const queryClient = useQueryClient();
+  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
+
+  const startMutation = useMutation({
+    mutationFn: () => clubStreamApi.start({ title, description: description || undefined }),
+    onSuccess: (stream) => {
+      setActiveStreamId(stream.id);
+      setStreamError(null);
+      setIsLive(true);
+      // ingest address/key sa czescia statusu polaczenia
+      queryClient.invalidateQueries({ queryKey: ["youtube", "status"] });
+    },
+    onError: (error: { response?: { data?: { message?: string } } }) => {
+      setStreamError(
+        error.response?.data?.message ?? "Nie udalo sie utworzyc transmisji"
+      );
+    },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: () => clubStreamApi.stop(activeStreamId!),
+    onSuccess: () => {
+      setActiveStreamId(null);
+      setStreamError(null);
+      setIsLive(false);
+    },
+    onError: (error: { response?: { data?: { message?: string } } }) => {
+      setStreamError(
+        error.response?.data?.message ?? "Nie udalo sie zakonczyc transmisji"
+      );
+    },
+  });
+
   // Backend po callbacku OAuth przekierowuje tutaj z wynikiem w query
   const [searchParams, setSearchParams] = useSearchParams();
   const youtubeResult = searchParams.get("youtube");
@@ -261,18 +300,36 @@ export default function StudioPage() {
         <h1 className="text-display text-2xl">Studio</h1>
         <div className="flex items-center gap-3">
           {isLive ? (
-            <button onClick={() => setIsLive(false)} className="flex items-center gap-2 rounded-lg bg-live px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-600">
+            <button
+              onClick={() => stopMutation.mutate()}
+              disabled={stopMutation.isPending || !activeStreamId}
+              className="flex items-center gap-2 rounded-lg bg-live px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+            >
               <Radio className="h-4 w-4 animate-live-pulse" />
-              Zakończ transmisję
+              {stopMutation.isPending ? "Kończę…" : "Zakończ transmisję"}
             </button>
           ) : (
-            <button onClick={() => setIsLive(true)} className="btn-primary flex items-center gap-2 text-sm">
+            <button
+              onClick={() => startMutation.mutate()}
+              disabled={startMutation.isPending || !title.trim()}
+              className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+            >
               <Radio className="h-4 w-4" />
-              Rozpocznij stream
+              {startMutation.isPending ? "Tworzę transmisję…" : "Rozpocznij stream"}
             </button>
           )}
         </div>
       </div>
+
+      {streamError && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-orange/10 px-4 py-3 text-sm text-orange">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <p className="flex-1">{streamError}</p>
+          <button onClick={() => setStreamError(null)} className="opacity-60 hover:opacity-100">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left: Stream Preview + Info */}
@@ -318,7 +375,7 @@ export default function StudioPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted">Opis (opcjonalny)</label>
-                <textarea rows={2} placeholder="Dodaj opis transmisji..." className="w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm text-text placeholder:text-muted focus:border-lime focus:outline-none" />
+                <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Dodaj opis transmisji..." className="w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm text-text placeholder:text-muted focus:border-lime focus:outline-none" />
               </div>
             </div>
           </div>
