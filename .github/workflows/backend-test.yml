@@ -145,14 +145,12 @@ jobs:
           find /tmp/inso -maxdepth 2 -name inso -type f -exec chmod +x {} \; -exec dirname {} \; \
             | head -1 >> "$GITHUB_PATH"
 
-      # inso 13 nie ma juz --src: szuka plikow *.db.json w --workingDir,
-      # wiec eksport podsuwamy pod nazwa, ktora rozpoznaje.
+      # inso 13 nie ma juz --src: sciezke do eksportu podaje sie w --workingDir.
       - name: Run Insomnia smoke suite
         working-directory: backend
         run: |
-          cp insomnia/padelvision.insomnia.json insomnia/padelvision.db.json
           inso run test smoke \
-            --workingDir insomnia \
+            --workingDir insomnia/padelvision.insomnia.json \
             --env CI \
             --reporter spec \
             --ci
