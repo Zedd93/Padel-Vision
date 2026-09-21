@@ -87,6 +87,50 @@ open http://localhost:3000
 
 ---
 
+## Vercel — preview deploymenty frontendu
+
+Frontend (React + Vite) jest dodatkowo deployowany na Vercel, aby kazdy commit i pull request automatycznie dostawal podgladowy URL bez koniecznosci uruchamiania aplikacji lokalnie.
+
+### Konfiguracja projektu w Vercel
+
+1. **Import repozytorium** z GitHub (`Padel-Vision`)
+2. **Root Directory**: `frontend`
+3. **Framework Preset**: Vite (auto-wykrycie z `vercel.json`)
+4. **Build Command**: `npm run build` (z `vercel.json`)
+5. **Output Directory**: `dist` (z `vercel.json`)
+6. **Install Command**: `npm ci` (z `vercel.json`)
+
+### Wymagane zmienne srodowiskowe (Project Settings → Environment Variables)
+
+| Zmienna | Wartosc | Srodowisko |
+|---|---|---|
+| `VITE_API_URL` | `https://api.padelvision.tv` | Production |
+| `VITE_API_URL` | `https://api-staging.padelvision.tv` | Preview |
+| `VITE_WS_URL` | `wss://api.padelvision.tv/ws` | Production |
+| `VITE_WS_URL` | `wss://api-staging.padelvision.tv/ws` | Preview |
+| `VITE_GOOGLE_CLIENT_ID` | `<google-oauth-client-id>` | All |
+
+### Jak to dziala
+
+- **`main`** -> deploy do produkcji (`https://padelvision.tv` lub `*.vercel.app`)
+- **kazda inna galaz / PR** -> automatyczny preview URL (`https://padel-vision-git-<branch>-<team>.vercel.app`)
+- Vercel komentuje w PR z linkiem do podgladu i wynikami buildu
+- SPA routing dziala dzieki `rewrites` w `vercel.json`
+- PWA service worker (`sw.js`) ma `Cache-Control: no-cache`, zeby update'y dochodzily natychmiast
+
+### Backend CORS
+
+Backend musi akceptowac origin z domen Vercel. W `application.yml`:
+
+```yaml
+cors:
+  allowed-origins:
+    - https://padelvision.tv
+    - https://*.vercel.app
+```
+
+---
+
 ## Architektura systemu
 
 ### Diagram ogolny

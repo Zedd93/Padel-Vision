@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  Search,
   MoreHorizontal,
-  Shield,
   Ban,
   Crown,
   Eye,
@@ -12,14 +10,21 @@ import {
   Trash2,
   Mail,
   CheckCircle2,
-  XCircle,
   ArrowUpDown,
   Download,
-  RefreshCw,
-  User,
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
+import {
+  Button,
+  Badge,
+  Modal,
+  FilterTabs,
+  SearchInput,
+  SectionHeader,
+  type BadgeVariant,
+  type FilterTabOption,
+} from "@/components/ui";
 
 /* ─── Data ───────────────────────────────────────────── */
 
@@ -46,11 +51,11 @@ const INITIAL_USERS: UserData[] = [
   { id: "8", username: "marta_d", email: "marta@example.com", role: "CLUB_ADMIN", tier: "PASS", joined: "2024-07-30", status: "active", subs: 1, bits: 450 },
 ];
 
-const ROLE_BADGE: Record<string, { label: string; color: string }> = {
-  ADMIN: { label: "Admin", color: "bg-red-500/20 text-red-400" },
-  MOD: { label: "Mod", color: "bg-purple-500/20 text-purple-400" },
-  CLUB_ADMIN: { label: "Klub", color: "bg-blue-500/20 text-blue-400" },
-  USER: { label: "User", color: "bg-bg4 text-muted" },
+const ROLE_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
+  ADMIN: { label: "Admin", variant: "danger" },
+  MOD: { label: "Mod", variant: "purple" },
+  CLUB_ADMIN: { label: "Klub", variant: "info" },
+  USER: { label: "User", variant: "neutral" },
 };
 
 const TIER_BADGE: Record<string, { label: string; color: string }> = {
@@ -61,6 +66,13 @@ const TIER_BADGE: Record<string, { label: string; color: string }> = {
 
 const ALL_ROLES = ["USER", "MOD", "CLUB_ADMIN", "ADMIN"];
 const ALL_TIERS = ["FREE", "PASS", "PRO"];
+
+const ROLE_FILTER_OPTIONS: FilterTabOption[] = [
+  { value: "all", label: "Wszyscy" },
+  { value: "USER", label: "User" },
+  { value: "CLUB_ADMIN", label: "Klub" },
+  { value: "MOD", label: "Mod" },
+];
 
 type SortField = "username" | "role" | "tier" | "joined" | "subs" | "bits" | "status";
 type SortDir = "asc" | "desc";
@@ -269,12 +281,18 @@ export default function AdminUsersPage() {
   /* ─── Render ───────────────────────────────────── */
 
   const detailUser = showUserDetail ? users.find((u) => u.id === showUserDetail) : null;
+  const confirmUser = showConfirmModal && users.find((u) => u.id === showConfirmModal.userId);
+  const isBan = showConfirmModal?.action === "ban";
+  const isUnban = showConfirmModal?.action === "unban";
+  const isDelete = showConfirmModal?.action === "delete";
+  const roleModalUser = showRoleModal ? users.find((u) => u.id === showRoleModal) : undefined;
+  const tierModalUser = showTierModal ? users.find((u) => u.id === showTierModal) : undefined;
 
   return (
     <div className="p-6">
       {/* Toast */}
       {toast && (
-        <div className="fixed right-6 top-20 z-50 animate-in slide-in-from-right rounded-lg border border-lime/30 bg-bg2 px-4 py-3 text-sm text-lime shadow-lg">
+        <div className="fixed right-6 top-20 z-50 rounded-lg border border-lime/30 bg-bg2 px-4 py-3 text-sm text-lime shadow-lg">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" />
             {toast}
@@ -283,70 +301,43 @@ export default function AdminUsersPage() {
       )}
 
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-display text-2xl">Użytkownicy</h1>
-          <p className="text-xs text-muted">
-            {users.length} zarejestrowanych · {users.filter((u) => u.status === "active").length} aktywnych ·{" "}
-            {users.filter((u) => u.status === "banned").length} zbanowanych
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {selectedUsers.size > 0 && (
-            <button
-              onClick={handleBulkBan}
-              className="flex items-center gap-1.5 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/30"
-            >
-              <Ban className="h-3.5 w-3.5" />
-              Banuj zaznaczonych ({selectedUsers.size})
-            </button>
-          )}
-          <button
-            onClick={handleExportCSV}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg3 px-3 text-[11px] font-medium text-muted transition-colors hover:bg-bg4 hover:text-text"
-          >
-            <Download className="h-3.5 w-3.5" />
-            CSV
-          </button>
-        </div>
-      </div>
+      <SectionHeader
+        title="Użytkownicy"
+        subtitle={`${users.length} zarejestrowanych · ${users.filter((u) => u.status === "active").length} aktywnych · ${users.filter((u) => u.status === "banned").length} zbanowanych`}
+        actions={
+          <>
+            {selectedUsers.size > 0 && (
+              <Button
+                variant="danger"
+                size="sm"
+                icon={Ban}
+                onClick={handleBulkBan}
+              >
+                Banuj zaznaczonych ({selectedUsers.size})
+              </Button>
+            )}
+            <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
+              CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Filters */}
-      <div className="mb-4 flex items-center gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            placeholder="Szukaj po nazwie lub emailu..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-border bg-bg3 py-2 pl-10 pr-4 text-sm text-text placeholder:text-muted focus:border-lime focus:outline-none"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text"
-            >
-              <XCircle className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {["all", "USER", "CLUB_ADMIN", "MOD"].map((r) => (
-            <button
-              key={r}
-              onClick={() => setRoleFilter(r)}
-              className={cn(
-                "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
-                roleFilter === r
-                  ? "bg-lime/20 text-lime"
-                  : "bg-bg3 text-muted hover:text-text"
-              )}
-            >
-              {r === "all" ? "Wszyscy" : ROLE_BADGE[r]?.label || r}
-            </button>
-          ))}
-        </div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Szukaj po nazwie lub emailu..."
+          containerClassName="max-w-sm flex-1"
+        />
+        <FilterTabs
+          options={ROLE_FILTER_OPTIONS}
+          value={roleFilter}
+          onChange={setRoleFilter}
+          variant="pills"
+          size="sm"
+        />
       </div>
 
       {/* Results count */}
@@ -385,6 +376,7 @@ export default function AdminUsersPage() {
                 const role = ROLE_BADGE[user.role] || ROLE_BADGE.USER;
                 const tier = TIER_BADGE[user.tier] || TIER_BADGE.FREE;
                 const isSelected = selectedUsers.has(user.id);
+                const isActive = user.status === "active";
                 return (
                   <tr
                     key={user.id}
@@ -406,21 +398,16 @@ export default function AdminUsersPage() {
                         onClick={() => setShowUserDetail(user.id)}
                         className="text-left transition-colors hover:text-lime"
                       >
-                        <p className="text-sm font-medium text-text">
-                          {user.username}
-                        </p>
+                        <p className="text-sm font-medium text-text">{user.username}</p>
                         <p className="text-[10px] text-muted">{user.email}</p>
                       </button>
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => setShowRoleModal(user.id)}
-                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all hover:ring-1 hover:ring-lime/30"
                         title="Kliknij aby zmienić rolę"
                       >
-                        <span className={cn("rounded-full px-2 py-0.5", role.color)}>
-                          {role.label}
-                        </span>
+                        <Badge variant={role.variant} size="xs">{role.label}</Badge>
                       </button>
                     </td>
                     <td className="px-4 py-3">
@@ -432,32 +419,22 @@ export default function AdminUsersPage() {
                         {tier.label}
                       </button>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-text">
-                      {user.subs}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-text">
-                      {user.bits}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted">
-                      {user.joined}
-                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-text">{user.subs}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-text">{user.bits}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{user.joined}</td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() =>
                           setShowConfirmModal({
                             userId: user.id,
-                            action: user.status === "banned" ? "unban" : "ban",
+                            action: isActive ? "ban" : "unban",
                           })
                         }
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-[10px] font-semibold transition-all hover:ring-1",
-                          user.status === "active"
-                            ? "bg-emerald-500/20 text-emerald-400 hover:ring-emerald-500/30"
-                            : "bg-red-500/20 text-red-400 hover:ring-red-500/30"
-                        )}
-                        title={user.status === "active" ? "Kliknij aby zbanować" : "Kliknij aby odbanować"}
+                        title={isActive ? "Kliknij aby zbanować" : "Kliknij aby odbanować"}
                       >
-                        {user.status === "active" ? "Aktywny" : "Zbanowany"}
+                        <Badge variant={isActive ? "success" : "danger"} size="xs">
+                          {isActive ? "Aktywny" : "Zbanowany"}
+                        </Badge>
                       </button>
                     </td>
                     <td className="relative px-4 py-3" ref={openMenu === user.id ? menuRef : undefined}>
@@ -475,42 +452,30 @@ export default function AdminUsersPage() {
 
                       {/* Dropdown Menu */}
                       {openMenu === user.id && (
-                        <div className="absolute right-4 top-full z-30 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-[#0B0C10] shadow-xl">
+                        <div className="absolute right-4 top-full z-30 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-bg shadow-xl">
                           <button
-                            onClick={() => {
-                              setShowUserDetail(user.id);
-                              setOpenMenu(null);
-                            }}
+                            onClick={() => { setShowUserDetail(user.id); setOpenMenu(null); }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text transition-colors hover:bg-bg3"
                           >
                             <Eye className="h-3.5 w-3.5 text-muted" />
                             Zobacz profil
                           </button>
                           <button
-                            onClick={() => {
-                              setShowRoleModal(user.id);
-                              setOpenMenu(null);
-                            }}
+                            onClick={() => { setShowRoleModal(user.id); setOpenMenu(null); }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text transition-colors hover:bg-bg3"
                           >
                             <UserCog className="h-3.5 w-3.5 text-muted" />
                             Zmień rolę
                           </button>
                           <button
-                            onClick={() => {
-                              setShowTierModal(user.id);
-                              setOpenMenu(null);
-                            }}
+                            onClick={() => { setShowTierModal(user.id); setOpenMenu(null); }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text transition-colors hover:bg-bg3"
                           >
                             <Crown className="h-3.5 w-3.5 text-muted" />
                             Zmień plan
                           </button>
                           <button
-                            onClick={() => {
-                              window.location.href = `mailto:${user.email}`;
-                              setOpenMenu(null);
-                            }}
+                            onClick={() => { window.location.href = `mailto:${user.email}`; setOpenMenu(null); }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text transition-colors hover:bg-bg3"
                           >
                             <Mail className="h-3.5 w-3.5 text-muted" />
@@ -521,25 +486,19 @@ export default function AdminUsersPage() {
                             onClick={() => {
                               setShowConfirmModal({
                                 userId: user.id,
-                                action: user.status === "banned" ? "unban" : "ban",
+                                action: isActive ? "ban" : "unban",
                               });
                               setOpenMenu(null);
                             }}
                             className={cn(
                               "flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-bg3",
-                              user.status === "banned" ? "text-emerald-400" : "text-orange"
+                              isActive ? "text-orange" : "text-emerald-400"
                             )}
                           >
-                            {user.status === "banned" ? (
-                              <>
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                Odbanuj
-                              </>
+                            {isActive ? (
+                              <><Ban className="h-3.5 w-3.5" />Zbanuj</>
                             ) : (
-                              <>
-                                <Ban className="h-3.5 w-3.5" />
-                                Zbanuj
-                              </>
+                              <><CheckCircle2 className="h-3.5 w-3.5" />Odbanuj</>
                             )}
                           </button>
                           <button
@@ -577,238 +536,168 @@ export default function AdminUsersPage() {
             Wyświetlanie {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} z {filtered.length}
           </p>
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="rounded-lg border border-border bg-bg3 px-3 py-1.5 text-xs text-muted transition-colors hover:bg-bg4 hover:text-text disabled:opacity-40"
             >
               ←
-            </button>
+            </Button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
+              <Button
                 key={p}
+                variant={currentPage === p ? "primary" : "outline"}
+                size="sm"
                 onClick={() => setCurrentPage(p)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  currentPage === p
-                    ? "bg-lime/20 text-lime"
-                    : "border border-border bg-bg3 text-muted hover:bg-bg4 hover:text-text"
-                )}
               >
                 {p}
-              </button>
+              </Button>
             ))}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="rounded-lg border border-border bg-bg3 px-3 py-1.5 text-xs text-muted transition-colors hover:bg-bg4 hover:text-text disabled:opacity-40"
             >
               →
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* ─── Role Change Modal ───────────────────── */}
-      {showRoleModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setShowRoleModal(null)}
-        >
-          <div
-            className="w-80 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-display text-lg">Zmień rolę</h3>
-            <p className="mt-1 text-xs text-muted">
-              {users.find((u) => u.id === showRoleModal)?.username}
-            </p>
-            <div className="mt-4 space-y-2">
-              {ALL_ROLES.map((r) => {
-                const badge = ROLE_BADGE[r];
-                const isCurrent = users.find((u) => u.id === showRoleModal)?.role === r;
-                return (
-                  <button
-                    key={r}
-                    onClick={() => handleChangeRole(showRoleModal, r)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-lg border px-4 py-2.5 text-sm transition-all",
-                      isCurrent
-                        ? "border-lime bg-lime/10 text-lime"
-                        : "border-border bg-bg3 text-text hover:border-lime/30"
-                    )}
-                  >
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", badge?.color)}>
-                      {badge?.label || r}
-                    </span>
-                    {isCurrent && <CheckCircle2 className="h-4 w-4 text-lime" />}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setShowRoleModal(null)}
-              className="btn-secondary mt-4 w-full py-2 text-sm"
-            >
-              Anuluj
-            </button>
-          </div>
+      <Modal
+        isOpen={!!showRoleModal}
+        onClose={() => setShowRoleModal(null)}
+        size="sm"
+        title="Zmień rolę"
+        subtitle={roleModalUser ? roleModalUser.username : undefined}
+        footer={
+          <Button variant="secondary" fullWidth onClick={() => setShowRoleModal(null)}>
+            Anuluj
+          </Button>
+        }
+      >
+        <div className="space-y-2">
+          {ALL_ROLES.map((r) => {
+            const badge = ROLE_BADGE[r];
+            const isCurrent = roleModalUser?.role === r;
+            return (
+              <button
+                key={r}
+                onClick={() => showRoleModal && handleChangeRole(showRoleModal, r)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-lg border px-4 py-2.5 text-sm transition-all",
+                  isCurrent
+                    ? "border-lime bg-lime/10 text-lime"
+                    : "border-border bg-bg3 text-text hover:border-lime/30"
+                )}
+              >
+                <Badge variant={badge.variant} size="xs">{badge.label}</Badge>
+                {isCurrent && <CheckCircle2 className="h-4 w-4 text-lime" />}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </Modal>
 
       {/* ─── Tier Change Modal ───────────────────── */}
-      {showTierModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setShowTierModal(null)}
-        >
-          <div
-            className="w-80 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-display text-lg">Zmień plan</h3>
-            <p className="mt-1 text-xs text-muted">
-              {users.find((u) => u.id === showTierModal)?.username}
-            </p>
-            <div className="mt-4 space-y-2">
-              {ALL_TIERS.map((t) => {
-                const badge = TIER_BADGE[t];
-                const isCurrent = users.find((u) => u.id === showTierModal)?.tier === t;
-                return (
-                  <button
-                    key={t}
-                    onClick={() => handleChangeTier(showTierModal, t)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-lg border px-4 py-2.5 text-sm transition-all",
-                      isCurrent
-                        ? "border-lime bg-lime/10"
-                        : "border-border bg-bg3 hover:border-lime/30"
-                    )}
-                  >
-                    <span className={cn("font-semibold", badge?.color)}>
-                      {badge?.label || t}
-                    </span>
-                    {isCurrent && <CheckCircle2 className="h-4 w-4 text-lime" />}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setShowTierModal(null)}
-              className="btn-secondary mt-4 w-full py-2 text-sm"
-            >
-              Anuluj
-            </button>
-          </div>
+      <Modal
+        isOpen={!!showTierModal}
+        onClose={() => setShowTierModal(null)}
+        size="sm"
+        title="Zmień plan"
+        subtitle={tierModalUser ? tierModalUser.username : undefined}
+        footer={
+          <Button variant="secondary" fullWidth onClick={() => setShowTierModal(null)}>
+            Anuluj
+          </Button>
+        }
+      >
+        <div className="space-y-2">
+          {ALL_TIERS.map((t) => {
+            const badge = TIER_BADGE[t];
+            const isCurrent = tierModalUser?.tier === t;
+            return (
+              <button
+                key={t}
+                onClick={() => showTierModal && handleChangeTier(showTierModal, t)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-lg border px-4 py-2.5 text-sm transition-all",
+                  isCurrent
+                    ? "border-lime bg-lime/10"
+                    : "border-border bg-bg3 hover:border-lime/30"
+                )}
+              >
+                <span className={cn("font-semibold", badge.color)}>{badge.label}</span>
+                {isCurrent && <CheckCircle2 className="h-4 w-4 text-lime" />}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </Modal>
 
       {/* ─── Confirm Modal (Ban/Unban/Delete) ────── */}
-      {showConfirmModal && (() => {
-        const user = users.find((u) => u.id === showConfirmModal.userId);
-        if (!user) return null;
-        const isBan = showConfirmModal.action === "ban";
-        const isUnban = showConfirmModal.action === "unban";
-        const isDelete = showConfirmModal.action === "delete";
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            onClick={() => setShowConfirmModal(null)}
-          >
-            <div
-              className="w-96 rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center gap-3">
-                <div
-                  className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-full",
-                    isDelete ? "bg-red-500/20" : isBan ? "bg-orange/20" : "bg-emerald-500/20"
-                  )}
-                >
-                  {isDelete ? (
-                    <Trash2 className="h-5 w-5 text-red-400" />
-                  ) : isBan ? (
-                    <Ban className="h-5 w-5 text-orange" />
-                  ) : (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-display text-lg">
-                    {isDelete ? "Usuń konto" : isBan ? "Zbanuj użytkownika" : "Odbanuj użytkownika"}
-                  </h3>
-                  <p className="text-xs text-muted">{user.username} ({user.email})</p>
-                </div>
-              </div>
-              <p className="text-sm text-muted">
-                {isDelete
-                  ? "Czy na pewno chcesz usunąć to konto? Ta akcja jest nieodwracalna."
-                  : isBan
-                  ? "Użytkownik straci dostęp do platformy. Czy kontynuować?"
-                  : "Użytkownik odzyska dostęp do platformy. Czy kontynuować?"}
-              </p>
-              {isDelete && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-500/10 p-3 text-xs text-red-400">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  Wszystkie dane użytkownika zostaną usunięte
-                </div>
-              )}
-              <div className="mt-5 flex gap-3">
-                <button
-                  onClick={() => setShowConfirmModal(null)}
-                  className="btn-secondary flex-1 py-2.5 text-sm"
-                >
-                  Anuluj
-                </button>
-                <button
-                  onClick={() => {
-                    if (isDelete) handleDelete(user.id);
-                    else handleToggleBan(user.id);
-                  }}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors",
-                    isDelete
-                      ? "bg-red-500 text-white hover:bg-red-600"
-                      : isBan
-                      ? "bg-orange text-black hover:bg-orange/80"
-                      : "bg-emerald-500 text-white hover:bg-emerald-600"
-                  )}
-                >
-                  {isDelete ? "Usuń" : isBan ? "Zbanuj" : "Odbanuj"}
-                </button>
-              </div>
-            </div>
+      <Modal
+        isOpen={!!showConfirmModal && !!confirmUser}
+        onClose={() => setShowConfirmModal(null)}
+        size="sm"
+        icon={isDelete ? Trash2 : isBan ? Ban : CheckCircle2}
+        iconColor={isDelete ? "text-red-400" : isBan ? "text-orange" : "text-emerald-400"}
+        iconBgColor={isDelete ? "bg-red-500/20" : isBan ? "bg-orange/20" : "bg-emerald-500/20"}
+        title={isDelete ? "Usuń konto" : isBan ? "Zbanuj użytkownika" : "Odbanuj użytkownika"}
+        subtitle={confirmUser ? `${confirmUser.username} (${confirmUser.email})` : undefined}
+        footer={
+          confirmUser && (
+            <>
+              <Button variant="secondary" onClick={() => setShowConfirmModal(null)}>
+                Anuluj
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  if (isDelete) handleDelete(confirmUser.id);
+                  else handleToggleBan(confirmUser.id);
+                }}
+              >
+                {isDelete ? "Usuń" : isBan ? "Zbanuj" : "Odbanuj"}
+              </Button>
+            </>
+          )
+        }
+      >
+        <p className="text-sm text-muted">
+          {isDelete
+            ? "Czy na pewno chcesz usunąć to konto? Ta akcja jest nieodwracalna."
+            : isBan
+            ? "Użytkownik straci dostęp do platformy. Czy kontynuować?"
+            : "Użytkownik odzyska dostęp do platformy. Czy kontynuować?"}
+        </p>
+        {isDelete && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-500/10 p-3 text-xs text-red-400">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            Wszystkie dane użytkownika zostaną usunięte
           </div>
-        );
-      })()}
+        )}
+      </Modal>
 
       {/* ─── User Detail Modal ───────────────────── */}
-      {showUserDetail && detailUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setShowUserDetail(null)}
-        >
-          <div
-            className="w-[420px] rounded-xl border border-border bg-[#0B0C10] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-5 flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-lime/10 text-display text-xl text-lime">
-                {detailUser.username[0].toUpperCase()}
-              </div>
-              <div>
-                <h3 className="text-display text-lg">{detailUser.username}</h3>
-                <p className="text-xs text-muted">{detailUser.email}</p>
-              </div>
-            </div>
-
+      <Modal
+        isOpen={!!showUserDetail && !!detailUser}
+        onClose={() => setShowUserDetail(null)}
+        size="sm"
+        title={detailUser?.username || ""}
+        subtitle={detailUser?.email}
+      >
+        {detailUser && (
+          <>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-bg3 p-3">
                 <p className="text-[10px] text-muted">Rola</p>
-                <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", ROLE_BADGE[detailUser.role]?.color)}>
+                <Badge variant={ROLE_BADGE[detailUser.role]?.variant ?? "neutral"} size="sm">
                   {ROLE_BADGE[detailUser.role]?.label}
-                </span>
+                </Badge>
               </div>
               <div className="rounded-lg bg-bg3 p-3">
                 <p className="text-[10px] text-muted">Plan</p>
@@ -830,39 +719,42 @@ export default function AdminUsersPage() {
               </div>
               <div className="rounded-lg bg-bg3 p-3">
                 <p className="text-[10px] text-muted">Status</p>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-xs font-semibold",
-                    detailUser.status === "active" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                  )}
-                >
+                <Badge variant={detailUser.status === "active" ? "success" : "danger"} size="sm">
                   {detailUser.status === "active" ? "Aktywny" : "Zbanowany"}
-                </span>
+                </Badge>
               </div>
             </div>
 
             <div className="mt-5 flex gap-2">
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={UserCog}
+                fullWidth
                 onClick={() => {
                   setShowUserDetail(null);
                   setShowRoleModal(detailUser.id);
                 }}
-                className="btn-secondary flex flex-1 items-center justify-center gap-1.5 py-2 text-xs"
               >
-                <UserCog className="h-3.5 w-3.5" />
-                Zmień rolę
-              </button>
-              <button
+                Rola
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Crown}
+                fullWidth
                 onClick={() => {
                   setShowUserDetail(null);
                   setShowTierModal(detailUser.id);
                 }}
-                className="btn-secondary flex flex-1 items-center justify-center gap-1.5 py-2 text-xs"
               >
-                <Crown className="h-3.5 w-3.5" />
-                Zmień plan
-              </button>
-              <button
+                Plan
+              </Button>
+              <Button
+                variant={detailUser.status === "banned" ? "primary" : "danger"}
+                size="sm"
+                icon={detailUser.status === "banned" ? CheckCircle2 : Ban}
+                fullWidth
                 onClick={() => {
                   setShowUserDetail(null);
                   setShowConfirmModal({
@@ -870,35 +762,13 @@ export default function AdminUsersPage() {
                     action: detailUser.status === "banned" ? "unban" : "ban",
                   });
                 }}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-colors",
-                  detailUser.status === "banned"
-                    ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
-                    : "bg-orange/20 text-orange hover:bg-orange/30"
-                )}
               >
-                {detailUser.status === "banned" ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Odbanuj
-                  </>
-                ) : (
-                  <>
-                    <Ban className="h-3.5 w-3.5" />
-                    Zbanuj
-                  </>
-                )}
-              </button>
+                {detailUser.status === "banned" ? "Odbanuj" : "Zbanuj"}
+              </Button>
             </div>
-            <button
-              onClick={() => setShowUserDetail(null)}
-              className="btn-secondary mt-3 w-full py-2 text-sm"
-            >
-              Zamknij
-            </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

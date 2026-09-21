@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish_images:
+        description: "Build and publish Docker images to GHCR"
+        type: boolean
+        default: true
+      deploy:
+        description: "Deploy to DigitalOcean after publishing"
+        type: boolean
+        default: false
 
 jobs:
   # ─── Frontend Pipeline ─────────────────────────────
@@ -28,18 +37,33 @@ jobs:
     needs: backend-test
     uses: ./.github/workflows/backend-build.yml
 
-  # ─── Docker Publish (after both pipelines pass) ────
+  # ─── Docker Publish ─────────────────────────────────
+  # Runs on:
+  #   - push to main (automatic on every merge)
+  #   - manual workflow_dispatch when "publish_images" is true
   docker-publish:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_images)
     needs: [frontend-build, backend-build]
     uses: ./.github/workflows/docker-publish.yml
     permissions:
       contents: read
       packages: write
 
-  # ─── Deploy (after images published) ───────────────
+  # ─── Deploy to DigitalOcean ─────────────────────────
+  # Runs on:
+  #   - push to main (automatic, after images are published)
+  #   - manual workflow_dispatch when "deploy" is true
+  #     (works even when publish_images is false — pulls existing :latest)
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: docker-publish
+    if: |
+      always() &&
+      (needs.docker-publish.result == 'success' || needs.docker-publish.result == 'skipped') &&
+      (
+        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+        (github.event_name == 'workflow_dispatch' && inputs.deploy)
+      )
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
