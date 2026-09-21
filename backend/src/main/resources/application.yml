@@ -58,9 +58,24 @@ aws:
     bucket: ${AWS_S3_BUCKET:padelvision-media-dev}
     region: ${AWS_REGION:eu-central-1}
 
-# RTMP
+# RTMP — wycofywane w Fazie 2 migracji na YouTube (docs/YOUTUBE_MIGRATION_PLAN.md)
 rtmp:
   server-url: ${RTMP_SERVER_URL:rtmps://stream.padelvision.app/live}
+
+# YouTube Live — konfiguracja Fazy 0, użyta od Fazy 1
+# Setup: docs/YOUTUBE_SETUP.md
+youtube:
+  client-id: ${YOUTUBE_CLIENT_ID:}
+  client-secret: ${YOUTUBE_CLIENT_SECRET:}
+  redirect-uri: ${YOUTUBE_REDIRECT_URI:http://localhost:8080/api/club/youtube/callback}
+  # AES-256-GCM, base64 z `openssl rand -base64 32`. Pusty = OAuth wyłączony.
+  token-enc-key: ${YOUTUBE_TOKEN_ENC_KEY:}
+  default-privacy: ${YOUTUBE_DEFAULT_PRIVACY:unlisted}
+  default-latency: ${YOUTUBE_DEFAULT_LATENCY:low}
+  daily-quota-units: ${YOUTUBE_DAILY_QUOTA_UNITS:10000}
+  poll-interval-ms: ${YOUTUBE_POLL_INTERVAL_MS:60000}
+  # Dokąd wraca przeglądarka klubu po zakończeniu flow OAuth
+  post-connect-redirect: ${YOUTUBE_POST_CONNECT_REDIRECT:http://localhost:5173/studio}
 
 # Stripe
 stripe:

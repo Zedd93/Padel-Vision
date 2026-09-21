@@ -50,6 +50,9 @@ public class SecurityConfig {
                                 "/api/docs/**",
                                 "/api/health",
                                 "/api/webhooks/**",
+                                // Google przekierowuje tu przeglądarkę bez nagłówka JWT —
+                                // tożsamość klubu odtwarzana z jednorazowego `state`
+                                "/api/club/youtube/callback",
                                 "/api/streams/**",
                                 "/api/clubs/**",
                                 "/api/clubs",
