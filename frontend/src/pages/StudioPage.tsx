@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Radio,
   X,
@@ -23,6 +23,7 @@ import { useSearchParams } from "react-router-dom";
 import { YouTubeConnectionCard } from "@/components/studio/YouTubeConnectionCard";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { clubStreamApi } from "@/api/clubStream";
+import type { LiveScore } from "@/components/stream/types";
 
 // Mock club data
 const MOCK_CLUB = {
@@ -63,6 +64,34 @@ function advancePoint(current: GamePoint): GamePoint {
   const idx = POINT_SEQUENCE.indexOf(current);
   return idx < 3 ? POINT_SEQUENCE[idx + 1] : current;
 }
+
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+}
+
+/** Stan panelu sędziowskiego → wynik w formacie, który odbiera strona transmisji. */
+function toLiveScore(match: PadelMatchState, startedAt: number | null): LiveScore {
+  return {
+    team1: match.team1,
+    team2: match.team2,
+    score1: match.games.team1,
+    score2: match.games.team2,
+    currentSet: match.currentSet,
+    sets: match.sets,
+    gameScore: match.isTiebreak
+      ? {
+          team1: String(match.tiebreakPoints.team1),
+          team2: String(match.tiebreakPoints.team2),
+        }
+      : { team1: match.points.team1, team2: match.points.team2 },
+    elapsedTime: startedAt ? formatElapsed(Date.now() - startedAt) : "",
+  };
+}
+
+/** Kilka szybkich kliknięć w punkty wysyłamy jako jedną aktualizację. */
+const SCORE_SYNC_DEBOUNCE_MS = 300;
 
 function getGamePointLabel(points: { team1: GamePoint; team2: GamePoint }): {
   team1: string;
@@ -222,12 +251,14 @@ export default function StudioPage() {
   // polaczenia dopiero po pierwszym starcie, bo wtedy powstaje staly strumien.
   const queryClient = useQueryClient();
   const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
+  const [streamStartedAt, setStreamStartedAt] = useState<number | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
   const startMutation = useMutation({
     mutationFn: () => clubStreamApi.start({ title, description: description || undefined }),
     onSuccess: (stream) => {
       setActiveStreamId(stream.id);
+      setStreamStartedAt(Date.now());
       setStreamError(null);
       setIsLive(true);
       // ingest address/key sa czescia statusu polaczenia
@@ -244,6 +275,7 @@ export default function StudioPage() {
     mutationFn: () => clubStreamApi.stop(activeStreamId!),
     onSuccess: () => {
       setActiveStreamId(null);
+      setStreamStartedAt(null);
       setStreamError(null);
       setIsLive(false);
     },
@@ -253,6 +285,19 @@ export default function StudioPage() {
       );
     },
   });
+
+  // Każda zmiana wyniku w panelu sędziowskim trafia do widzów. Backend
+  // rozgłasza ją na /topic/stream.{id}.score, a strona transmisji pokazuje
+  // z opóźnieniem dopasowanym do obrazu z YouTube.
+  useEffect(() => {
+    if (!activeStreamId) return;
+    const timer = setTimeout(() => {
+      clubStreamApi
+        .updateScore(activeStreamId, { ...toLiveScore(match, streamStartedAt) })
+        .catch(() => setStreamError("Nie udało się wysłać wyniku widzom — sprawdź połączenie"));
+    }, SCORE_SYNC_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [match, activeStreamId, streamStartedAt]);
 
   // Backend po callbacku OAuth przekierowuje tutaj z wynikiem w query
   const [searchParams, setSearchParams] = useSearchParams();
