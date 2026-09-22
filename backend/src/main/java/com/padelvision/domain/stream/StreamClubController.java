@@ -47,7 +47,8 @@ public class StreamClubController {
     public ResponseEntity<ApiResponse<Void>> updateScore(
             @PathVariable String id,
             @Valid @RequestBody ScoreUpdateRequest request) {
-        streamService.updateScore(id, request.getScore());
+        Club club = clubService.getClubSettings(getAuthenticatedUserId());
+        streamService.updateScore(club.getId(), id, request.getScore());
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 

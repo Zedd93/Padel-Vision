@@ -5,8 +5,10 @@ import com.padelvision.domain.club.ClubRepository;
 import com.padelvision.domain.match.Match;
 import com.padelvision.domain.match.MatchRepository;
 import com.padelvision.integration.youtube.YouTubeLiveService;
+import com.padelvision.infrastructure.websocket.StreamEventPublisher;
 import com.padelvision.integration.youtube.YouTubeProperties;
 import com.padelvision.shared.enums.StreamStatus;
+import com.padelvision.shared.exception.BadRequestException;
 import com.padelvision.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class StreamService {
     private final MatchRepository matchRepository;
     private final YouTubeLiveService youTubeLiveService;
     private final YouTubeProperties youTubeProperties;
+    private final StreamEventPublisher streamEventPublisher;
 
     /**
      * Get all live streams with club info (ordered by viewer count desc).
@@ -131,12 +134,23 @@ public class StreamService {
     }
 
     /**
-     * Update the live score on a stream's linked match and broadcast via WebSocket.
+     * Zapisuje wynik (jesli transmisja ma przypisany mecz) i rozglasza go
+     * widzom na /topic/stream.{id}.score.
+     * <p>
+     * To jedyna droga rozglaszania wyniku - wczesniej robil to otwarty
+     * endpoint STOMP, przez ktory kazdy mogl wyslac widzom falszywy wynik.
+     * Klub moze zmienic wynik tylko swojej transmisji; cudza jest zglaszana
+     * jako nieistniejaca, zeby nie zdradzac, ze istnieje.
      * Mirrors: PUT /api/club/stream/:id/score
      */
     @Transactional
-    public void updateScore(String streamId, Map<String, Object> scoreData) {
+    public void updateScore(String clubId, String streamId, Map<String, Object> scoreData) {
+        if (scoreData == null || scoreData.isEmpty()) {
+            throw new BadRequestException("Brak wyniku do zapisania");
+        }
+
         Stream stream = streamRepository.findById(streamId)
+                .filter(s -> clubId.equals(s.getClubId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Stream", "id", streamId));
 
         if (stream.getMatchId() != null) {
@@ -146,8 +160,8 @@ public class StreamService {
             matchRepository.save(match);
         }
 
-        // WebSocket broadcast would be handled in the controller/WebSocket layer
-        log.debug("Score updated for stream {}", streamId);
+        streamEventPublisher.publishScoreUpdate(streamId, scoreData);
+        log.debug("Score updated and broadcast for stream {}", streamId);
     }
 
 }

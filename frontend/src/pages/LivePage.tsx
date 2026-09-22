@@ -6,23 +6,16 @@ import { cn } from "@/utils/cn";
 import { useQuery } from "@tanstack/react-query";
 import { StreamPlayer } from "@/components/stream/StreamPlayer";
 import { streamsApi } from "@/api/streams";
-import type { StreamMarker } from "@/components/stream/types";
+import type { LiveScore, StreamMarker } from "@/components/stream/types";
+import ChatPanel from "@/components/stream/ChatPanel";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { useStreamLatency } from "@/hooks/useStreamLatency";
 import { useLatencyCompensatedEvents } from "@/hooks/useLatencyCompensatedEvents";
-import { io } from "socket.io-client";
 
 /* ─── Types ─── */
 
-interface ScoreData {
-  team1: string;
-  team2: string;
-  score1: number;
-  score2: number;
-  currentSet: number;
-  sets: { team1: number; team2: number }[];
-  gameScore: { team1: string; team2: string };
-  elapsedTime: string;
-}
+// Kontrakt wspólny ze Studiem — patrz components/stream/types.ts
+type ScoreData = LiveScore;
 
 
 /* ─── Demo data ─── */
@@ -64,10 +57,13 @@ const DEMO_MATCH_STATS = {
 export default function LivePage() {
   const { id: streamId } = useParams<{ id: string }>();
 
-  const [score, setScore] = useState<ScoreData>(DEMO_SCORE);
-  const [viewerCount, setViewerCount] = useState(1247);
+  // Prawdziwy wynik przychodzi ze Studia; zanim nadejdzie, zakładki pokazują
+  // dane demo, ale nakładka na wideo jest ukryta (patrz niżej)
+  const [liveScore, setLiveScore] = useState<ScoreData | null>(null);
+  const score = liveScore ?? DEMO_SCORE;
   const [activeTab, setActiveTab] = useState(0);
-  const [markers, setMarkers] = useState<StreamMarker[]>(DEMO_MARKERS);
+  // Backend nie publikuje jeszcze znaczników — zostają dane demo
+  const [markers] = useState<StreamMarker[]>(DEMO_MARKERS);
   const [showStatsOverlay, setShowStatsOverlay] = useState(false);
 
   // Share dropdown state
@@ -130,7 +126,10 @@ export default function LivePage() {
     queryFn: async () => (await streamsApi.getById(streamId!)).data.data,
     enabled: Boolean(streamId),
     retry: false,
+    // liczbę widzów aktualizuje poller YouTube po stronie backendu
+    refetchInterval: 30_000,
   });
+  const viewerCount = stream?.viewerCount ?? 0;
 
   // Obraz z YouTube jest 15-30 s za rzeczywistoscia, a zdarzenia ze STOMP
   // docieraja natychmiast. Bez bufora overlay zdradzalby punkt przed akcja.
@@ -142,57 +141,22 @@ export default function LivePage() {
     enabled: stream?.status === "LIVE",
   });
 
-  const { push: pushScore } = useLatencyCompensatedEvents<ScoreData>(latencyMs, setScore);
-  const { push: pushMarker } = useLatencyCompensatedEvents<StreamMarker>(
-    latencyMs,
-    (marker) => setMarkers((prev) => [...prev, marker])
-  );
+  const { push: pushScore } = useLatencyCompensatedEvents<ScoreData>(latencyMs, setLiveScore);
 
-  // Real-time score updates via Socket.io
+  // Wynik ze Studia przez STOMP (StreamService.updateScore). Idzie przez bufor
+  // opóźnienia, żeby nakładka nie pokazywała punktu przed zagraniem.
+  const { connected: wsConnected, subscribe } = useWebSocket();
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000";
-    const socket = io(apiUrl, { transports: ["websocket", "polling"] });
-
-    socket.on("connect", () => {
-      socket.emit("chat:join", { streamId });
+    if (!wsConnected || !streamId) return;
+    const subscription = subscribe(`/topic/stream.${streamId}.score`, (frame) => {
+      try {
+        pushScore(JSON.parse(frame.body) as ScoreData);
+      } catch {
+        // uszkodzona ramka — pomijamy
+      }
     });
-
-    socket.on("score:update", (data: ScoreData) => {
-      pushScore(data);
-    });
-
-    socket.on("viewers:count", ({ count }: { count: number }) => {
-      setViewerCount(count);
-    });
-
-    socket.on("stream:marker", (marker: StreamMarker) => {
-      pushMarker(marker);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [streamId, pushScore, pushMarker]);
-
-  // Demo: simulate score changing every 15 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setScore((prev) => {
-        const prevT1 = prev.gameScore ? parseInt(prev.gameScore.team1, 10) || 0 : 0;
-        const prevT2 = prev.gameScore ? parseInt(prev.gameScore.team2, 10) || 0 : 0;
-        const newGameT1 = prevT1 + (Math.random() > 0.5 ? 1 : 0);
-        const newGameT2 = prevT2 + (Math.random() > 0.5 ? 1 : 0);
-        return {
-          ...prev,
-          gameScore: {
-            team1: String(newGameT1 % 5),
-            team2: String(newGameT2 % 5),
-          },
-        };
-      });
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => subscription?.unsubscribe();
+  }, [wsConnected, streamId, subscribe, pushScore]);
 
   const tabs = ["O meczu", "Statystyki", "Bracket"];
 
@@ -211,7 +175,8 @@ export default function LivePage() {
             onTimeUpdate={(t) => (playerTimeRef.current = t)}
           />
 
-          {/* Score Overlay */}
+          {/* Score Overlay — tylko prawdziwy wynik, nigdy dane demo */}
+          {liveScore && (
           <div className="absolute right-4 top-4 z-20 rounded-lg bg-black/70 px-3 py-2 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="text-right">
@@ -230,6 +195,7 @@ export default function LivePage() {
               </p>
             )}
           </div>
+          )}
 
           {/* Live badge + viewers */}
           <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
@@ -498,21 +464,7 @@ export default function LivePage() {
 
       {/* Chat Sidebar */}
       <div className="h-[400px] w-full border-l border-border lg:h-auto lg:w-[340px]">
-        <div className="flex h-full flex-col bg-bg2">
-          <div className="border-b border-border px-4 py-3">
-            <h3 className="text-sm font-semibold text-text">Czat na żywo</h3>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <p className="text-xs text-muted text-center">Czat ładuje się...</p>
-          </div>
-          <div className="border-t border-border p-3">
-            <input
-              type="text"
-              placeholder="Napisz wiadomość..."
-              className="w-full rounded-lg border border-border bg-bg3 px-3 py-2 text-sm text-text placeholder:text-muted focus:border-lime focus:outline-none"
-            />
-          </div>
-        </div>
+        {streamId && <ChatPanel streamId={streamId} delayMs={latencyMs} />}
       </div>
 
       {/* Cheer / Donation Modal */}

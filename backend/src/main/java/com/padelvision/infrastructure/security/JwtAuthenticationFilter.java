@@ -51,9 +51,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+                // Principalem jest ID uzytkownika, a nie UserDetails: kontrolery
+                // czytaja auth.getName() jako userId i szukaja po nim w bazie
+                // (np. clubRepository.findByUserId). Z UserDetails getName()
+                // zwracal e-mail i wszystkie te zapytania konczyly sie 404.
+                // Role nadal bierzemy z bazy, wiec zmiana roli dziala od razu.
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                userDetails,
+                                userId,
                                 null,
                                 userDetails.getAuthorities()
                         );
