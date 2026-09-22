@@ -5,7 +5,6 @@
   "outputDirectory": "dist",
   "installCommand": "npm ci",
   "devCommand": "npm run dev",
-  "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
     { "source": "/((?!api/|assets/|.*\\..*).*)", "destination": "/index.html" }
