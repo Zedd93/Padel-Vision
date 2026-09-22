@@ -32,7 +32,9 @@ const MOCK_CLIP = {
   votes: 342,
   format: "horizontal" as "horizontal" | "vertical",
   createdAt: "2026-03-13T14:30:00Z",
-  hlsUrl: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+  // Klip to zakres czasu w nagraniu transmisji na YouTube — nic nie renderujemy
+  youtubeVideoId: "dQw4w9WgXcQ",
+  startSeconds: 1245,
 };
 
 /* ─── Helpers ──────────────────────────────────── */
@@ -121,18 +123,14 @@ export default function ClipDetailPage() {
                   : "aspect-video"
               )}
             >
-              <video
+              <iframe
                 className="h-full w-full"
-                controls
-                autoPlay
-                playsInline
-                poster="/placeholder-clip.jpg"
-              >
-                <source
-                  src="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
-                  type="application/x-mpegURL"
-                />
-              </video>
+                src={`https://www.youtube.com/embed/${clip.youtubeVideoId}?start=${clip.startSeconds}&end=${clip.startSeconds + clip.duration}&autoplay=1&rel=0&playsinline=1`}
+                title={clip.title}
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
             </div>
 
             {/* Title & actions */}

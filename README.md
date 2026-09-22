@@ -163,7 +163,7 @@ flowchart TB
         S3_GLACIER["S3 Glacier Archiwum"]
     end
 
-    IVS["Amazon IVS Low-Latency"]
+    YT["YouTube Live"]
 
     subgraph MONITORING["Monitoring"]
         CW["CloudWatch"]
@@ -186,9 +186,9 @@ flowchart TB
     API --> PGBOUNCER --> RDS
     API --> REDIS
     API --> S3
-    API --> IVS
-    OBS -- RTMP ingest --> IVS
-    IVS -- HLS playback --> CF
+    API -- YouTube Data API --> YT
+    OBS -- RTMP ingest --> YT
+    YT -- Odtwarzanie przez IFrame Player --> WEB
     S3 -- Lifecycle rule --> S3_GLACIER
     API --> CW
     API --> XRAY
@@ -565,16 +565,24 @@ flowchart TD
     L -->|Token expired| N[401 → auto refresh]
 ```
 
+> **Streaming przeniesiony na YouTube Live.** Sekcje ponizej opisujace Amazon IVS
+> oraz koszty streamingu pochodza sprzed migracji i czekaja na przepisanie.
+> Aktualny stan, architektura i analiza kosztow:
+> [`docs/YOUTUBE_MIGRATION_PLAN.md`](docs/YOUTUBE_MIGRATION_PLAN.md).
+> W skrocie: ingest, transkodowanie, CDN i archiwum VOD sa po stronie YouTube,
+> wiec koszt streamingu to **$0** zamiast 49-57% budzetu infrastruktury.
+
 ### Proces streamowania na zywo
 
 ```mermaid
 flowchart TD
-    OBS[OBS / Kamera kortu] -->|RTMP stream| RTMP[RTMP Server]
-    RTMP -->|POST /api/webhooks/rtmp publish| WH[WebhookController]
-    WH --> SS[StreamService]
-    SS -->|Znajdz klub po streamKey| DB[(PostgreSQL)]
-    SS -->|Ustaw status LIVE| DB
-    SS -->|Publikuj event| SEP[StreamEventPublisher]
+    ST[Studio: Rozpocznij transmisje] -->|POST /api/club/stream/start| SS[StreamService]
+    SS -->|liveBroadcasts.insert + bind| YT[YouTube Live]
+    SS -->|Zapisz youtubeBroadcastId| DB[(PostgreSQL)]
+    OBS[OBS / Kamera kortu] -->|RTMP ingest| YT
+    POLL[YouTubeStatusPoller] -->|liveBroadcasts.list co 60s| YT
+    POLL -->|Ustaw status LIVE| DB
+    POLL -->|Publikuj event| SEP[StreamEventPublisher]
     SEP -->|STOMP /topic/streams.events| WS[WebSocket Broker]
     WS -->|stream:live| FE[Frontend/Mobile]
 

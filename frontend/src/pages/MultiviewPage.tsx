@@ -17,7 +17,8 @@ import { cn } from '@/utils/cn';
 
 interface StreamSlot {
   id: string;
-  hlsUrl: string;
+  /** Uzupelniane, gdy transmisja ma nagranie na YouTube. */
+  youtubeVideoId: string | null;
   title: string;
   clubName: string;
   viewers: number;
@@ -29,7 +30,7 @@ interface StreamSlot {
 const AVAILABLE_STREAMS: StreamSlot[] = [
   {
     id: 'stream-1',
-    hlsUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    youtubeVideoId: null,
     title: 'SILESIA OPEN 2025 — FINAŁ OPEN A',
     clubName: 'Racket Club Katowice',
     viewers: 1247,
@@ -37,7 +38,7 @@ const AVAILABLE_STREAMS: StreamSlot[] = [
   },
   {
     id: 'stream-2',
-    hlsUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    youtubeVideoId: null,
     title: 'Liga Weekendowa — Mecz 3',
     clubName: 'Padel Kraków',
     viewers: 432,
@@ -45,7 +46,7 @@ const AVAILABLE_STREAMS: StreamSlot[] = [
   },
   {
     id: 'stream-3',
-    hlsUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    youtubeVideoId: null,
     title: 'Turniej Kobiet — Półfinał',
     clubName: 'Smash Arena Wrocław',
     viewers: 289,
@@ -53,21 +54,21 @@ const AVAILABLE_STREAMS: StreamSlot[] = [
   },
   {
     id: 'stream-4',
-    hlsUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    youtubeVideoId: null,
     title: 'Americano Night — Kort 2',
     clubName: 'Vamos Padel Gdańsk',
     viewers: 156,
   },
   {
     id: 'stream-5',
-    hlsUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    youtubeVideoId: null,
     title: 'Trening Otwarty — Kort 1',
     clubName: 'Warsaw Padel Club',
     viewers: 89,
   },
   {
     id: 'stream-6',
-    hlsUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    youtubeVideoId: null,
     title: 'Junior Cup — Ćwierćfinał',
     clubName: 'Padel Academy Poznań',
     viewers: 201,
@@ -91,7 +92,6 @@ function MiniPlayer({
   onExpand,
   onRemove,
 }: {
-  hlsUrl: string;
   title: string;
   clubName: string;
   viewers: number;
@@ -311,7 +311,6 @@ export default function MultiViewPage() {
             <div className="col-span-3">
               {slots[0] ? (
                 <MiniPlayer
-                  hlsUrl={slots[0].hlsUrl}
                   title={slots[0].title}
                   clubName={slots[0].clubName}
                   viewers={slots[0].viewers}
@@ -330,7 +329,6 @@ export default function MultiViewPage() {
                 <div key={i} className="flex-1">
                   {slots[i] ? (
                     <MiniPlayer
-                      hlsUrl={slots[i]!.hlsUrl}
                       title={slots[i]!.title}
                       clubName={slots[i]!.clubName}
                       viewers={slots[i]!.viewers}
@@ -353,7 +351,6 @@ export default function MultiViewPage() {
               <div key={i}>
                 {slots[i] ? (
                   <MiniPlayer
-                    hlsUrl={slots[i]!.hlsUrl}
                     title={slots[i]!.title}
                     clubName={slots[i]!.clubName}
                     viewers={slots[i]!.viewers}
@@ -375,7 +372,6 @@ export default function MultiViewPage() {
               <div key={i}>
                 {slots[i] ? (
                   <MiniPlayer
-                    hlsUrl={slots[i]!.hlsUrl}
                     title={slots[i]!.title}
                     clubName={slots[i]!.clubName}
                     viewers={slots[i]!.viewers}
