@@ -77,27 +77,48 @@ W środku mają być: `install-service.ps1`, `deploy.ps1`, `.env.production.exam
       <https://www.enterprisedb.com/downloads/postgres-postgresql-downloads>
       (Windows x86-64) i zainstaluj. Zapamiętaj hasło użytkownika `postgres`.
       Port zostaw `5432`.
-- [ ] **Jeśli już jest** — użyjemy istniejącej instancji, tylko z osobną bazą.
+- [ ] **Jeśli już jest** — użyjemy istniejącej instancji, tylko z osobną bazą
+      i osobnym użytkownikiem. Innych baz na tej instancji nie ruszamy.
+
+- [ ] Znajdź program `psql` — polecenie odczyta jego położenie z usługi
+      PostgreSQL, więc działa niezależnie od tego, jak baza była instalowana:
+
+  ```powershell
+  $psql = Join-Path (Split-Path ((Get-CimInstance Win32_Service -Filter "Name LIKE 'postgres%'" | Select-Object -First 1).PathName -replace '^"?(.+?\\(?:pg_ctl|postgres)\.exe).*$','$1')) 'psql.exe'; $psql; Test-Path $psql
+  ```
+
+  Ma wypisać ścieżkę i `True`. Zmienna `$psql` działa do zamknięcia okna
+  PowerShella — kolejne polecenia rób w tym samym oknie.
+
+- [ ] Sprawdź, czy baza słucha na standardowym porcie — ma pokazać wiersz
+      z `Listen`:
+
+  ```powershell
+  Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue
+  ```
+
+  Jeśli nic nie pokazało, instancja używa innego portu — trzeba go wpisać
+  w `DATABASE_URL` w kroku 6.
 
 - [ ] Wygeneruj hasło dla bazy PadelVision i **zapisz je** — przyda się w kroku 6:
 
   ```powershell
-  wsl -d Ubuntu22 -- openssl rand -hex 24
+  $b = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); -join ($b | ForEach-Object { $_.ToString('x2') })
   ```
 
-- [ ] Utwórz użytkownika i bazę (w miejsce `HASLO` wklej hasło z poprzedniego punktu;
-      zapyta o hasło użytkownika `postgres`):
+  Generator kryptograficzny Windowsa — bez WSL-a i bez `openssl`, którego
+  w minimalnej instalacji Ubuntu może nie być.
+
+- [ ] Utwórz użytkownika i bazę (w miejsce `HASLO` wklej hasło z poprzedniego
+      punktu; zapyta o hasło administratora bazy `postgres`):
 
   ```powershell
-  & 'C:\Program Files\PostgreSQL\16\bin\psql.exe' -U postgres -c "CREATE USER padelvision WITH PASSWORD 'HASLO';"
+  & $psql -U postgres -c "CREATE USER padelvision WITH PASSWORD 'HASLO';"
   ```
 
   ```powershell
-  & 'C:\Program Files\PostgreSQL\16\bin\psql.exe' -U postgres -c "CREATE DATABASE padelvision OWNER padelvision;"
+  & $psql -U postgres -c "CREATE DATABASE padelvision OWNER padelvision;"
   ```
-
-  Jeśli PostgreSQL był już wcześniej w innej wersji, zamień `16` w ścieżce na
-  numer wersji z `C:\Program Files\PostgreSQL\`.
 
 Tabele założy sam backend przy pierwszym starcie (Flyway).
 
@@ -163,11 +184,13 @@ oczekiwane.
   ```
 
 - [ ] `DATABASE_PASSWORD=` — hasło z kroku 3
-- [ ] `JWT_SECRET=` — wygeneruj i wklej:
+- [ ] `JWT_SECRET=` — wygeneruj i wklej (96 znaków, HS512 wymaga co najmniej 64):
 
   ```powershell
-  wsl -d Ubuntu22 -- openssl rand -hex 48
+  $b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); -join ($b | ForEach-Object { $_.ToString('x2') })
   ```
+
+- [ ] Jeśli w kroku 3 baza nie słuchała na porcie 5432 — popraw port w `DATABASE_URL=`
 
 - [ ] `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_TOKEN_ENC_KEY` —
       **te same wartości** co w lokalnym `.env` z Fazy 0. Klucz szyfrowania musi
@@ -326,7 +349,7 @@ WebSocket (czat) przechodzi przez tunel bez dodatkowej konfiguracji.
 |---|---|---|
 | Deploy wisi na „Waiting for a runner” | runner offline albo bez etykiety | krok 8 — runner zielony, etykieta `padelvision-prod` |
 | `Nie ma uslugi padelvision-api` | skrypt nie przeszedł do końca | krok 7 |
-| `JWT_SECRET ma N znakow` | za krótki klucz | krok 6, `openssl rand -hex 48` |
+| `JWT_SECRET ma N znakow` | za krótki klucz | krok 6 — wygeneruj nowy |
 | `Backend nie odpowiedzial` + błąd bazy w logu | zła nazwa/hasło bazy | krok 3 i `DATABASE_*` w kroku 6 |
 | `Backend nie odpowiedzial` + `RedisConnectionFailure` | Redis nie działa | `wsl -d Ubuntu22 -u root -- service redis-server start` |
 | `Access denied` przy zatrzymaniu usługi | brak uprawnień runnera | uruchom ponownie krok 7 |
