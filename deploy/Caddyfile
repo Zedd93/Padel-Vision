@@ -1,0 +1,22 @@
+# Reverse proxy przed backendem na droplecie.
+# Caddy sam pobiera i odnawia certyfikat HTTPS dla domeny z API_DOMAIN
+# (np. api.padelvision.tv). Wymaga rekordu DNS A wskazującego na droplet.
+
+{$API_DOMAIN} {
+	encode gzip zstd
+
+	# WebSocket (STOMP pod /ws) przechodzi przez reverse_proxy bez
+	# dodatkowej konfiguracji — Caddy obsługuje upgrade połączenia sam.
+	reverse_proxy backend:4000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

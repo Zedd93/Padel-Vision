@@ -156,5 +156,5 @@ green " Faza 0 zweryfikowana — można ruszać z Fazą 1"
 green "════════════════════════════════════════════"
 echo
 dim "Pozostałe kroki z docs/YOUTUBE_SETUP.md:"
-dim "  • YOUTUBE_TOKEN_ENC_KEY w Secrets Manager + backup"
+dim "  • YOUTUBE_TOKEN_ENC_KEY w menedzerze hasel + backup"
 dim "  • redirect URI oauthplayground zostaje do Fazy 3, potem do usunięcia"

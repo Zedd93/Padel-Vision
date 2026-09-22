@@ -1,3 +1,7 @@
+# Produkcja na droplecie DigitalOcean: backend + baza + cache + HTTPS.
+# Frontend działa na Vercelu — tutaj go nie ma.
+# Wdrażane przez .github/workflows/deploy.yml, instrukcja: docs/DEPLOY.md
+
 services:
   # ─── PostgreSQL ───────────────────────────────────────
   postgres:
@@ -17,13 +21,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 512M
 
   # ─── Redis ────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: always
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - /mnt/storage/redis:/data
     healthcheck:
@@ -34,39 +38,20 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
-
-  # ─── Frontend (Vite/React) ───────────────────────────
-  frontend:
-    image: ghcr.io/zedd93/padelvision-frontend:latest
-    restart: always
-    ports:
-      - "127.0.0.1:3000:3000"
-    env_file:
-      - .env.production
-    environment:
-      NODE_ENV: production
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+          memory: 192M
 
   # ─── Backend (Spring Boot) ──────────────────────────
   backend:
     image: ghcr.io/zedd93/padelvision-backend:latest
     restart: always
+    # Tylko localhost — z internetu backend jest osiągalny wyłącznie przez Caddy.
+    # Port zostaje na hoście do debugowania: curl localhost:4000/api/health
     ports:
       - "127.0.0.1:4000:4000"
     env_file:
       - .env.production
     environment:
-      SPRING_PROFILES_ACTIVE: production
+      SPRING_PROFILES_ACTIVE: prod
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-padelvision}
       DATABASE_USERNAME: ${POSTGRES_USER:-padelvision}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -79,12 +64,41 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:4000/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     deploy:
       resources:
         limits:
           memory: 1G
+
+  # ─── Caddy (HTTPS + reverse proxy) ───────────────────
+  # Sam pobiera i odnawia certyfikat Let's Encrypt dla API_DOMAIN.
+  # Wymaga rekordu DNS A: API_DOMAIN → IP dropletu.
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env.production}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  # Certyfikaty TLS — muszą przetrwać restart, inaczej Let's Encrypt
+  # szybko zablokuje wydawanie nowych (limity)
+  caddy_data:
+  caddy_config:
