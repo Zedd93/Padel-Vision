@@ -1,5 +1,16 @@
 name: "Deploy to DigitalOcean"
 
+# Backend + PostgreSQL + Redis + Caddy (HTTPS) na droplecie.
+# Frontend działa na Vercelu i nie jest tu wdrażany.
+#
+# Wymagane sekrety repozytorium (Settings → Secrets and variables → Actions):
+#   DIGITALOCEAN_HOST      — adres IP dropletu
+#   DIGITALOCEAN_USERNAME  — użytkownik SSH (zwykle root)
+#   DIGITALOCEAN_SSH_KEY   — klucz prywatny SSH do dropletu
+#   ENV_PRODUCTION         — cała zawartość pliku .env.production
+#
+# Instrukcja krok po kroku: docs/DEPLOY.md
+
 on:
   workflow_call:
 
@@ -7,68 +18,74 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      # pobranie prywatnych obrazów z GHCR na droplecie
+      packages: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-
-      - name: Fetch secrets from AWS Secrets Manager
-        id: secrets
+      - name: Check deploy secrets
+        env:
+          DO_HOST: ${{ secrets.DIGITALOCEAN_HOST }}
+          DO_KEY: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
         run: |
-          echo "Fetching production secrets from AWS SM..."
-          SECRETS=$(aws secretsmanager get-secret-value \
-            --secret-id padelvision/prod \
-            --query 'SecretString' \
-            --output text)
+          missing=0
+          [ -z "$DO_HOST" ]        && echo "::error::Brak sekretu DIGITALOCEAN_HOST"    && missing=1
+          [ -z "$DO_KEY" ]         && echo "::error::Brak sekretu DIGITALOCEAN_SSH_KEY" && missing=1
+          [ -z "$ENV_PRODUCTION" ] && echo "::error::Brak sekretu ENV_PRODUCTION"       && missing=1
+          if [ "$missing" -eq 1 ]; then
+            echo "Instrukcja konfiguracji: docs/DEPLOY.md"
+            exit 1
+          fi
 
-          # Generate .env.production from JSON
-          echo "$SECRETS" | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          for k, v in data.items():
-              if not k.startswith('#'):
-                  print(f'{k}={v}')
-          " > .env.production
-
-          # Extract deploy-specific values into step outputs
-          echo "do_host=$(echo "$SECRETS" | python3 -c "import json,sys; print(json.load(sys.stdin).get('DIGITALOCEAN_HOST',''))")" >> "$GITHUB_OUTPUT"
-          echo "do_user=$(echo "$SECRETS" | python3 -c "import json,sys; print(json.load(sys.stdin).get('DIGITALOCEAN_USERNAME','root'))")" >> "$GITHUB_OUTPUT"
-          echo "ghcr_token=$(echo "$SECRETS" | python3 -c "import json,sys; print(json.load(sys.stdin).get('GHCR_TOKEN',''))")" >> "$GITHUB_OUTPUT"
+      # Sekret przekazany przez env, nie wklejany w skrypt — bez ryzyka
+      # wstrzyknięcia i z automatycznym maskowaniem w logach
+      - name: Write .env.production
+        env:
+          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
+        run: |
+          umask 077
+          printf '%s\n' "$ENV_PRODUCTION" > .env.production
+          if ! grep -q '^POSTGRES_PASSWORD=.\+' .env.production; then
+            echo "::error::ENV_PRODUCTION nie zawiera POSTGRES_PASSWORD — bez niego baza nie wystartuje"
+            exit 1
+          fi
 
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ steps.secrets.outputs.do_host }}
-          username: ${{ steps.secrets.outputs.do_user }}
+          host: ${{ secrets.DIGITALOCEAN_HOST }}
+          username: ${{ secrets.DIGITALOCEAN_USERNAME || 'root' }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          source: "docker-compose.prod.yml,.env.production"
+          source: "docker-compose.prod.yml,.env.production,deploy/Caddyfile"
           target: /opt/padelvision/
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
           DEPLOY_SHA: ${{ github.sha }}
-          GHCR_TOKEN: ${{ steps.secrets.outputs.ghcr_token }}
+          # Token ważny tylko w trakcie tego joba — wystarczy do pobrania obrazów
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
         with:
-          host: ${{ steps.secrets.outputs.do_host }}
-          username: ${{ steps.secrets.outputs.do_user }}
+          host: ${{ secrets.DIGITALOCEAN_HOST }}
+          username: ${{ secrets.DIGITALOCEAN_USERNAME || 'root' }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           envs: DEPLOY_SHA,GHCR_TOKEN,GHCR_USER
           script: |
             set -e
             cd /opt/padelvision
+            chmod 600 .env.production
+            mkdir -p /mnt/storage/postgres /mnt/storage/redis
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml --env-file .env.production pull
             docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
-            echo "Waiting for services..."
-            sleep 10
-            docker compose -f docker-compose.prod.yml ps
+            docker logout ghcr.io
+            echo "Czekam na start usług..."
+            sleep 20
+            docker compose -f docker-compose.prod.yml --env-file .env.production ps
             docker image prune -f
             echo "Deploy complete: $DEPLOY_SHA"

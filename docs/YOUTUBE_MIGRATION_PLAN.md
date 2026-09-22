@@ -443,7 +443,7 @@ dostęp, zanim pojawi się darmowy odtwarzacz.
 > Krok po kroku w konsoli Google: **[`YOUTUBE_SETUP.md`](YOUTUBE_SETUP.md)**.
 > Sekcje poniżej to referencja wartości — są już wprowadzone do repo
 > (`application.yml`, `backend/.env.example`, `frontend/.env.example`,
-> `scripts/secrets-template.json`).
+> `.env.production.example`).
 
 ### Backend (`application.yml` + sekrety)
 

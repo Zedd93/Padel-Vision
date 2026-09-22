@@ -1,5 +1,7 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws';
+// SockJS przyjmuje wyłącznie http(s):// — sam negocjuje WebSocket.
+// Adres ws:// kończy się wyjątkiem przy tworzeniu połączenia.
+export const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws';
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 export const COLORS = {

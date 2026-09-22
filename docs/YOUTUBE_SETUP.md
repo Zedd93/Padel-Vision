@@ -178,7 +178,7 @@ openssl rand -base64 32
 ```
 
 - [ ] Zapisz wynik jako `YOUTUBE_TOKEN_ENC_KEY` w menedżerze haseł
-- [ ] Wgraj do AWS Secrets Manager: `./scripts/secrets.sh edit dev`
+- [ ] Wpisz go do `.env` (lokalnie) i do sekretu GitHuba `ENV_PRODUCTION` (produkcja, patrz [DEPLOY.md](DEPLOY.md))
 - [ ] **Zrób backup poza repo i poza CI** — utrata klucza oznacza, że wszystkie
       kluby muszą przejść OAuth od nowa
 
@@ -186,7 +186,7 @@ openssl rand -base64 32
 
 ## 6. Zmienne środowiskowe
 
-Uzupełnij `backend/.env` (lokalnie) oraz AWS Secrets Manager (dev/prod):
+Uzupełnij `.env` w katalogu repo (lokalnie, czyta go `docker-compose.yml`) oraz sekret `ENV_PRODUCTION` w GitHubie (produkcja, szablon: `.env.production.example`):
 
 | Zmienna | Skąd | Uwagi |
 |---|---|---|
@@ -214,7 +214,7 @@ Frontend (`frontend/.env`, Vercel):
 
 - [ ] `./scripts/youtube-check.sh` kończy się zielonym `✓` i pokazuje kanał testowy
 - [ ] `liveStreams: OK` w wyjściu skryptu (to potwierdza, że 24 h minęło)
-- [ ] `YOUTUBE_TOKEN_ENC_KEY` w Secrets Manager + backup
+- [ ] `YOUTUBE_TOKEN_ENC_KEY` w menedżerze haseł + backup
 - [ ] Redirect URI `oauthplayground` zostaje do Fazy 3, potem do usunięcia
 - [ ] Wniosek weryfikacyjny do Google złożony **albo** świadomie odłożony
       z wiedzą, że refresh tokeny wygasają co 7 dni w trybie testowym
