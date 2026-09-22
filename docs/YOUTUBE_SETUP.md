@@ -178,7 +178,7 @@ openssl rand -base64 32
 ```
 
 - [ ] Zapisz wynik jako `YOUTUBE_TOKEN_ENC_KEY` w menedżerze haseł
-- [ ] Wpisz go do `.env` (lokalnie) i do sekretu GitHuba `ENV_PRODUCTION` (produkcja, patrz [DEPLOY.md](DEPLOY.md))
+- [ ] Wpisz go do `.env` (lokalnie) i do `C:\padelvision\.env.production` na serwerze firmowym (patrz [DEPLOY.md](DEPLOY.md))
 - [ ] **Zrób backup poza repo i poza CI** — utrata klucza oznacza, że wszystkie
       kluby muszą przejść OAuth od nowa
 
@@ -186,7 +186,7 @@ openssl rand -base64 32
 
 ## 6. Zmienne środowiskowe
 
-Uzupełnij `.env` w katalogu repo (lokalnie, czyta go `docker-compose.yml`) oraz sekret `ENV_PRODUCTION` w GitHubie (produkcja, szablon: `.env.production.example`):
+Uzupełnij `.env` w katalogu repo (lokalnie, czyta go `docker-compose.yml`) oraz `C:\padelvision\.env.production` na serwerze (produkcja, szablon: `deploy/windows/.env.production.example`):
 
 | Zmienna | Skąd | Uwagi |
 |---|---|---|

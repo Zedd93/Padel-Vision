@@ -1,139 +1,306 @@
-# Deploy na DigitalOcean
+# Deploy na serwer firmowy
 
 Jednorazowa konfiguracja serwera produkcyjnego. Potem każdy merge do `main`
-wdraża się sam.
+wdraża backend sam.
 
-**Co gdzie działa:**
+## Jak to działa
 
 | Część | Gdzie | Adres |
 |---|---|---|
 | Frontend | Vercel | `https://padelvision.tv` |
-| Backend + baza + Redis | droplet DigitalOcean | `https://api.padelvision.tv` |
-| HTTPS | Caddy na droplecie — sam pobiera i odnawia certyfikat | — |
+| Backend | usługa Windows na serwerze firmowym | `https://api.padelvision.tv` |
+| Baza | PostgreSQL na tym samym serwerze | `localhost:5432` |
+| Redis | WSL Ubuntu22 na tym samym serwerze | `localhost:6379` |
+| HTTPS | Cloudflare Tunnel (już działa na serwerze) | — |
 | Transmisje | YouTube Live | — |
 
-Sekrety trzymane są jako sekrety GitHuba. AWS nie jest potrzebny.
+**Dlaczego tak, a nie Docker:** serwer ma WSL1, a WSL1 nie uruchomi Dockera —
+nie ma prawdziwego jądra Linuksa. Przejście na WSL2 wymagałoby restartu serwera
+i zmieniłoby sieć, na której działa Nextcloud. Backend to jeden plik JAR, więc
+uruchamiamy go natywnie jako usługę Windows.
+
+**Dlaczego self-hosted runner:** serwer stoi za NAT-em, więc GitHub nie może się
+do niego zalogować. Runner zainstalowany na serwerze sam łączy się z GitHubem
+(ruch wychodzący) i odbiera zadania deployu. **Nie trzeba otwierać żadnego portu.**
+
+**Czego nie ruszamy:** nginx na 80 i 8086, Apache/Nextcloud na 8084, ArchiveCore
+na 3001, konfiguracja cloudflared — dokładamy tylko jedną regułę tunelu.
+
+**Konta i uprawnienia** (ważne na współdzielonym serwerze):
+
+| Konto | Co może |
+|---|---|
+| `LocalService` — backend | czytać swoje pliki, pisać tylko do `logs` |
+| `NETWORK SERVICE` — runner GitHub Actions | podmienić `backend.jar` i zrestartować **tylko** usługę `padelvision-api` |
+
+Żadne z nich nie jest administratorem.
 
 ---
 
-## A. Klucz SSH
+Wszystkie polecenia wykonujesz na serwerze (VPN + Pulpit zdalny)
+w **PowerShellu uruchomionym jako administrator**, chyba że napisano inaczej.
 
-- [ ] W terminalu na Macu:
+## Krok 1. Pliki instalacyjne na serwer
 
-  ```bash
-  ssh-keygen -t ed25519 -f ~/.ssh/padelvision_deploy -N "" -C "github-deploy"
-  ```
+- [ ] Na Macu skopiuj folder `deploy/windows` z repo
+- [ ] Na serwerze wklej go jako `C:\padelvision-setup`
+      (kopiowanie plików przez Pulpit zdalny działa zwykłym Ctrl+C / Ctrl+V)
 
-- [ ] Skopiuj **publiczną** część (przyda się w kroku B):
-
-  ```bash
-  pbcopy < ~/.ssh/padelvision_deploy.pub
-  ```
+W środku mają być: `install-service.ps1`, `deploy.ps1`, `.env.production.example`.
 
 ---
 
-## B. Serwer
+## Krok 2. Java 21
 
-- [ ] <https://cloud.digitalocean.com/droplets/new>
-- [ ] **Region:** Frankfurt (FRA1) — najbliżej Polski
-- [ ] **Image:** zakładka *Marketplace* → wyszukaj **Docker** → wybierz *Docker on Ubuntu*
-      (Docker jest od razu zainstalowany)
-- [ ] **Size:** *Basic* → *Regular* → **2 GB / 1 CPU** (~$12/mies.)
-- [ ] **Authentication:** *SSH Key* → *New SSH Key* → wklej klucz z kroku A → nazwa `github-deploy`
-- [ ] **Hostname:** `padelvision-prod` → **Create Droplet**
-- [ ] Skopiuj **adres IP** dropletu
-- [ ] Sprawdź połączenie (wstaw swoje IP):
+- [ ] Na serwerze wejdź na <https://adoptium.net/temurin/releases/?version=21&os=windows&arch=x64&package=jre>
+- [ ] Pobierz plik **.msi** i zainstaluj z domyślnymi opcjami
+- [ ] Sprawdź w **nowym** oknie PowerShella:
 
-  ```bash
-  ssh -i ~/.ssh/padelvision_deploy root@TWOJE_IP "docker --version"
+  ```powershell
+  java -version
   ```
 
-  Pierwsze połączenie zapyta o odcisk klucza — wpisz `yes`.
+  Ma pokazać `version "21...`. Jeśli pokazuje inną wersję, to nic — skrypt
+  instalacyjny sam znajdzie Javę 21.
 
 ---
 
-## C. Domena
+## Krok 3. PostgreSQL
 
-- [ ] U rejestratora domeny `padelvision.tv` → ustawienia DNS → dodaj rekord:
+- [ ] Sprawdź, czy PostgreSQL już jest na serwerze:
 
-  | Typ | Nazwa | Wartość | TTL |
-  |---|---|---|---|
-  | `A` | `api` | IP dropletu | 300 |
-
-- [ ] Sprawdź (może potrwać od kilku minut do godziny):
-
-  ```bash
-  dig +short api.padelvision.tv
+  ```powershell
+  Get-Service *postgres*
   ```
 
-  Ma zwrócić IP dropletu. **Nie odpalaj deployu, zanim to zadziała** — Caddy nie
-  dostanie certyfikatu, a Let's Encrypt po kilku nieudanych próbach blokuje
-  domenę na godzinę.
+- [ ] **Jeśli nic nie pokazało** — pobierz instalator PostgreSQL 16 z
+      <https://www.enterprisedb.com/downloads/postgres-postgresql-downloads>
+      (Windows x86-64) i zainstaluj. Zapamiętaj hasło użytkownika `postgres`.
+      Port zostaw `5432`.
+- [ ] **Jeśli już jest** — użyjemy istniejącej instancji, tylko z osobną bazą.
+
+- [ ] Wygeneruj hasło dla bazy PadelVision i **zapisz je** — przyda się w kroku 6:
+
+  ```powershell
+  wsl -d Ubuntu22 -- openssl rand -hex 24
+  ```
+
+- [ ] Utwórz użytkownika i bazę (w miejsce `HASLO` wklej hasło z poprzedniego punktu;
+      zapyta o hasło użytkownika `postgres`):
+
+  ```powershell
+  & 'C:\Program Files\PostgreSQL\16\bin\psql.exe' -U postgres -c "CREATE USER padelvision WITH PASSWORD 'HASLO';"
+  ```
+
+  ```powershell
+  & 'C:\Program Files\PostgreSQL\16\bin\psql.exe' -U postgres -c "CREATE DATABASE padelvision OWNER padelvision;"
+  ```
+
+  Jeśli PostgreSQL był już wcześniej w innej wersji, zamień `16` w ścieżce na
+  numer wersji z `C:\Program Files\PostgreSQL\`.
+
+Tabele założy sam backend przy pierwszym starcie (Flyway).
 
 ---
 
-## D. Plik z sekretami
+## Krok 4. Redis w WSL
 
-- [ ] W katalogu repo:
+- [ ] Zainstaluj i uruchom:
 
-  ```bash
-  cp .env.production.example .env.production
+  ```powershell
+  wsl -d Ubuntu22 -u root -- apt-get update
   ```
 
-- [ ] Wygeneruj hasło do bazy i wklej jako `POSTGRES_PASSWORD`:
-
-  ```bash
-  openssl rand -hex 24
+  ```powershell
+  wsl -d Ubuntu22 -u root -- apt-get install -y redis-server
   ```
 
-- [ ] Wygeneruj klucz JWT i wklej jako `JWT_SECRET`:
-
-  ```bash
-  openssl rand -base64 64 | tr -d '\n'
+  ```powershell
+  wsl -d Ubuntu22 -u root -- service redis-server start
   ```
 
-- [ ] Wpisz `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` i `YOUTUBE_TOKEN_ENC_KEY` —
-      te same co w lokalnym `.env` z Fazy 0
+- [ ] Sprawdź — ma odpowiedzieć `PONG`:
 
-Plik jest w `.gitignore`, nie trafi do repo. Zachowaj kopię w menedżerze haseł.
+  ```powershell
+  wsl -d Ubuntu22 -- redis-cli ping
+  ```
+
+- [ ] **Autostart po restarcie serwera.** Redis w WSL1 nie wstaje sam. Zrób to
+      **tak samo, jak u Was startuje Apache/Nextcloud** — najpewniej jest na to
+      zadanie w *Harmonogramie zadań*. Dopisz do niego:
+
+  ```
+  wsl.exe -d Ubuntu22 -u root -- service redis-server start
+  ```
+
+  Zadanie musi działać na tym samym koncie Windows, na którym zainstalowana jest
+  dystrybucja `Ubuntu22` — dystrybucje WSL są przypisane do użytkownika.
 
 ---
 
-## E. Sekrety w GitHubie
+## Krok 5. Pierwsze uruchomienie skryptu
 
-Cztery komendy w katalogu repo (wstaw swoje IP):
+```powershell
+cd C:\padelvision-setup
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-service.ps1
+```
+
+Skrypt znajdzie Javę, utworzy `C:\padelvision` i skopiuje tam szablon
+`.env.production`. **Zatrzyma się** z prośbą o uzupełnienie pliku — to
+oczekiwane.
+
+---
+
+## Krok 6. Uzupełnij konfigurację
+
+- [ ] Otwórz plik w Notatniku:
+
+  ```powershell
+  notepad C:\padelvision\.env.production
+  ```
+
+- [ ] `DATABASE_PASSWORD=` — hasło z kroku 3
+- [ ] `JWT_SECRET=` — wygeneruj i wklej:
+
+  ```powershell
+  wsl -d Ubuntu22 -- openssl rand -hex 48
+  ```
+
+- [ ] `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_TOKEN_ENC_KEY` —
+      **te same wartości** co w lokalnym `.env` z Fazy 0. Klucz szyfrowania musi
+      być identyczny, inaczej zapisane połączenia klubów z YouTube przestaną działać
+- [ ] Zapisz. Plik nie trafia do repo i nie ma go w GitHubie — **zrób kopię
+      w menedżerze haseł**
+
+---
+
+## Krok 7. Instalacja usługi
+
+Ten sam skrypt jeszcze raz:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-service.ps1
+```
+
+Tym razem zainstaluje usługę `padelvision-api`, ustawi konta i uprawnienia.
+Na końcu napisze, że usługi jeszcze nie uruchamia — plik `backend.jar` wgra
+pierwszy deploy.
+
+Jeśli port 4000 jest zajęty, skrypt to powie — wtedy uruchom go z innym, np.
+`-Port 4010`, i użyj tego portu w kroku 10. Deploy odczyta go sam z konfiguracji
+usługi.
+
+---
+
+## Krok 8. Runner GitHub Actions
+
+- [ ] W przeglądarce: <https://github.com/Zedd93/Padel-Vision/settings/actions/runners/new>
+- [ ] Wybierz **Windows** i **x64**
+- [ ] Wykonaj polecenia ze strony w PowerShellu, ale **w katalogu `C:\actions-runner`**
+      zamiast w katalogu domowym (pierwsze polecenie zamień na
+      `mkdir C:\actions-runner; cd C:\actions-runner`)
+- [ ] Przy `config.cmd` odpowiedz:
+
+  | Pytanie | Odpowiedź |
+  |---|---|
+  | runner group | Enter |
+  | name of runner | Enter |
+  | **additional labels** | **`padelvision-prod`** |
+  | work folder | Enter |
+  | **run the runner as service?** | **`Y`** |
+  | user account for the service | Enter (zostaje `NT AUTHORITY\NETWORK SERVICE`) |
+
+- [ ] Odśwież stronę <https://github.com/Zedd93/Padel-Vision/settings/actions/runners> —
+      runner ma być zielony, ze statusem **Idle**
+
+> Etykieta `padelvision-prod` jest kluczowa: tylko zadanie deployu jej szuka.
+> Testy i budowanie dalej lecą na serwerach GitHuba, nie obciążając firmowego.
+
+---
+
+## Krok 9. Pierwszy deploy
+
+Na Macu:
 
 ```bash
-gh secret set DIGITALOCEAN_HOST --body "TWOJE_IP"
+gh workflow run "Deploy App" -f publish_images=false -f deploy=true
 ```
 
 ```bash
-gh secret set DIGITALOCEAN_USERNAME --body "root"
+gh run watch
 ```
 
-```bash
-gh secret set DIGITALOCEAN_SSH_KEY < ~/.ssh/padelvision_deploy
-```
+Albo w przeglądarce: **Actions** → **Deploy App** → **Run workflow** →
+zaznacz **deploy** → **Run workflow**.
 
-```bash
-gh secret set ENV_PRODUCTION < .env.production
-```
+- [ ] Sprawdź na serwerze, że backend odpowiada:
 
-- [ ] Sprawdź, że są cztery:
-
-  ```bash
-  gh secret list
+  ```powershell
+  Invoke-WebRequest http://127.0.0.1:4000/api/health -UseBasicParsing
   ```
 
-> Do `DIGITALOCEAN_SSH_KEY` idzie klucz **prywatny** (bez `.pub`) — to on
-> pozwala GitHubowi zalogować się na serwer.
+  `StatusCode : 200` — działa.
+
+Deploy robi kopię poprzedniej wersji i jeśli nowa nie odpowie w 3 minuty,
+**sam przywraca poprzednią**.
 
 ---
 
-## F. Frontend na Vercelu
+## Krok 10. Cloudflare Tunnel
 
-- [ ] <https://vercel.com> → projekt **padel-vision** → *Settings* → *Environment Variables*
-- [ ] Dodaj dla środowiska **Production**:
+Backend słucha tylko na `127.0.0.1` — nie widać go nawet w sieci firmowej.
+Z internetu dochodzi się do niego wyłącznie przez tunel.
+
+Domena `padelvision.tv` musi być na tym samym koncie Cloudflare co tunel.
+
+- [ ] <https://one.dash.cloudflare.com> → **Networks** → **Tunnels** → Wasz tunel
+- [ ] **Jeśli jest przycisk *Configure*** (tunel zarządzany z panelu):
+      zakładka **Public Hostname** → **Add a public hostname**:
+
+  | Pole | Wartość |
+  |---|---|
+  | Subdomain | `api` |
+  | Domain | `padelvision.tv` |
+  | Type | `HTTP` |
+  | URL | `localhost:4000` |
+
+  → **Save**. Rekord DNS utworzy się sam.
+
+- [ ] **Jeśli tunel jest zarządzany lokalnie** (plik `config.yml`): dopisz regułę
+      **nad** ostatnią regułą `http_status:404`:
+
+  ```yaml
+    - hostname: api.padelvision.tv
+      service: http://localhost:4000
+  ```
+
+  potem utwórz rekord DNS i zrestartuj usługę:
+
+  ```powershell
+  cloudflared tunnel route dns NAZWA_TUNELU api.padelvision.tv
+  ```
+
+  ```powershell
+  Restart-Service cloudflared
+  ```
+
+- [ ] Z dowolnego komputera:
+
+  ```bash
+  curl https://api.padelvision.tv/api/health
+  ```
+
+WebSocket (czat) przechodzi przez tunel bez dodatkowej konfiguracji.
+
+---
+
+## Krok 11. Frontend na Vercelu
+
+- [ ] <https://vercel.com> → projekt **padel-vision** → *Settings* →
+      *Environment Variables* → dodaj dla **Production**:
 
   | Nazwa | Wartość |
   |---|---|
@@ -144,30 +311,12 @@ gh secret set ENV_PRODUCTION < .env.production
   `VITE_WS_URL` zaczyna się od **`https://`**, nie `wss://` — czat używa SockJS,
   który sam negocjuje WebSocket i odrzuca adresy `ws://`/`wss://`.
 
-- [ ] *Deployments* → ostatni produkcyjny → **Redeploy** — zmienne `VITE_*` są
-      wkompilowywane przy buildzie, więc bez przebudowy nie zadziałają
+- [ ] *Deployments* → ostatni produkcyjny → **⋯** → **Redeploy** —
+      zmienne `VITE_*` są wkompilowywane przy budowaniu
 
----
-
-## G. Pierwszy deploy
-
-```bash
-gh workflow run "Deploy App" -f publish_images=true -f deploy=true
-```
-
-- [ ] Obserwuj przebieg:
-
-  ```bash
-  gh run watch
-  ```
-
-- [ ] Sprawdź, że backend odpowiada przez HTTPS:
-
-  ```bash
-  curl https://api.padelvision.tv/api/health
-  ```
-
-Od teraz każdy merge do `main` wdraża się automatycznie.
+> Na serwerze działa już frontend Padel Vision pod nginx:8086. Produkcyjny
+> frontend jest na Vercelu, więc ten jest od niego niezależny — jeśli to stara
+> wersja, można go wyłączyć.
 
 ---
 
@@ -175,25 +324,32 @@ Od teraz każdy merge do `main` wdraża się automatycznie.
 
 | Objaw | Przyczyna | Co zrobić |
 |---|---|---|
-| `Brak sekretu …` w kroku *Check deploy secrets* | sekret nie ustawiony | wróć do kroku E |
-| `ENV_PRODUCTION nie zawiera POSTGRES_PASSWORD` | puste hasło w pliku | krok D, potem `gh secret set ENV_PRODUCTION < .env.production` |
-| `ssh: handshake failed` | zły klucz albo IP | sprawdź krok B — ręczny `ssh` musi działać |
-| `denied` przy `docker compose pull` | brak dostępu do obrazów GHCR | GitHub → *Packages* → `padelvision-backend` → *Package settings* → dodaj repo `Padel-Vision` z uprawnieniem *Read* |
-| `curl` do API wisi albo błąd certyfikatu | DNS nie wskazuje na droplet | krok C — `dig` musi zwracać IP |
-| Frontend nie łączy się z API | zmienne Vercela nieustawione albo bez redeployu | krok F |
+| Deploy wisi na „Waiting for a runner” | runner offline albo bez etykiety | krok 8 — runner zielony, etykieta `padelvision-prod` |
+| `Nie ma uslugi padelvision-api` | skrypt nie przeszedł do końca | krok 7 |
+| `JWT_SECRET ma N znakow` | za krótki klucz | krok 6, `openssl rand -hex 48` |
+| `Backend nie odpowiedzial` + błąd bazy w logu | zła nazwa/hasło bazy | krok 3 i `DATABASE_*` w kroku 6 |
+| `Backend nie odpowiedzial` + `RedisConnectionFailure` | Redis nie działa | `wsl -d Ubuntu22 -u root -- service redis-server start` |
+| `Access denied` przy zatrzymaniu usługi | brak uprawnień runnera | uruchom ponownie krok 7 |
+| `curl` do API zwraca 502/530 | tunel nie widzi backendu | krok 10 — port w regule musi się zgadzać |
+| Frontend nie łączy się z API | zmienne Vercela bez redeployu | krok 11 |
 
-Logi na serwerze:
+**Logi backendu:**
 
-```bash
-ssh -i ~/.ssh/padelvision_deploy root@TWOJE_IP "cd /opt/padelvision && docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=100 backend caddy"
+```powershell
+Get-Content C:\padelvision\logs\padelvision-api.out.log -Tail 100
+```
+
+**Stan usługi:**
+
+```powershell
+Get-Service padelvision-api
 ```
 
 ---
 
-## Aktualizacja sekretów
+## Zmiana konfiguracji
 
-Zmiana dowolnej zmiennej produkcyjnej:
+1. Edytuj `C:\padelvision\.env.production`
+2. `Restart-Service padelvision-api`
 
-1. Edytuj lokalny `.env.production`
-2. `gh secret set ENV_PRODUCTION < .env.production`
-3. `gh workflow run "Deploy App" -f publish_images=false -f deploy=true`
+Nowy deploy nie jest potrzebny — plik czytany jest przy każdym starcie.
