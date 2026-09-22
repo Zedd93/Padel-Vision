@@ -151,8 +151,8 @@ docker compose logs -f backend
 
 ## Czego ten test nie obejmuje
 
-- **Deploy na DigitalOcean** — zadanie `deploy` pada na kroku *Configure AWS
-  credentials* (brak sekretów AWS w repo). Test lokalny tego nie wymaga
+- **Deploy na serwer firmowy** — osobna konfiguracja, patrz [DEPLOY.md](DEPLOY.md).
+  Test lokalny tego nie wymaga
 - **Kompensacja opóźnienia** — overlay wyniku i czat działają na danych demo,
   dopóki panel sędziego nie jest podpięty pod prawdziwy mecz
 - **Multiview** — kafelki są nadal placeholderami

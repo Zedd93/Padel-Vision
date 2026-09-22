@@ -12,7 +12,7 @@ on:
         type: boolean
         default: true
       deploy:
-        description: "Deploy to DigitalOcean after publishing"
+        description: "Deploy backendu na serwer firmowy"
         type: boolean
         default: false
 
@@ -51,22 +51,17 @@ jobs:
       contents: read
       packages: write
 
-  # ─── Deploy to DigitalOcean ─────────────────────────
+  # ─── Deploy na serwer firmowy ───────────────────────
   # Runs on:
-  #   - push to main (automatic, after images are published)
+  #   - push to main (automatic, after backend tests and build pass)
   #   - manual workflow_dispatch when "deploy" is true
-  #     (works even when publish_images is false — pulls existing :latest)
+  # Nie zalezy od docker-publish: serwer uruchamia JAR z artefaktu
+  # backend-jar, a nie obraz Dockera (WSL1 nie obsluguje Dockera).
   deploy:
-    needs: docker-publish
+    needs: backend-build
     if: |
-      always() &&
-      (needs.docker-publish.result == 'success' || needs.docker-publish.result == 'skipped') &&
-      (
-        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-        (github.event_name == 'workflow_dispatch' && inputs.deploy)
-      )
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy)
     uses: ./.github/workflows/deploy.yml
-    secrets: inherit
     permissions:
       contents: read
-      packages: read

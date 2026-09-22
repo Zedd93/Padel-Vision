@@ -18,3 +18,14 @@ jobs:
       - name: Build package
         working-directory: backend
         run: mvn package -DskipTests -B
+
+      # JAR dla deployu na serwer firmowy (.github/workflows/deploy.yml).
+      # Tylko gdy deploy moze nastapic - PR-y nie zuzywaja miejsca na artefakty.
+      - name: Upload backend JAR
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+          if-no-files-found: error
+          retention-days: 3

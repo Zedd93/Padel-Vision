@@ -1,91 +1,41 @@
-name: "Deploy to DigitalOcean"
+name: "Deploy na serwer firmowy"
 
-# Backend + PostgreSQL + Redis + Caddy (HTTPS) na droplecie.
-# Frontend działa na Vercelu i nie jest tu wdrażany.
+# Backend jako usluga Windows na serwerze firmowym.
 #
-# Wymagane sekrety repozytorium (Settings → Secrets and variables → Actions):
-#   DIGITALOCEAN_HOST      — adres IP dropletu
-#   DIGITALOCEAN_USERNAME  — użytkownik SSH (zwykle root)
-#   DIGITALOCEAN_SSH_KEY   — klucz prywatny SSH do dropletu
-#   ENV_PRODUCTION         — cała zawartość pliku .env.production
+# Serwer stoi za NAT-em i nie przyjmuje polaczen z internetu, wiec GitHub
+# nie moze sie do niego zalogowac. Zamiast tego na serwerze dziala
+# self-hosted runner GitHub Actions: sam laczy sie z GitHubem (ruch
+# wychodzacy), odbiera to zadanie i wykonuje je lokalnie.
 #
-# Instrukcja krok po kroku: docs/DEPLOY.md
+# Konfiguracja produkcyjna (hasla, klucze) zyje wylacznie na serwerze
+# w C:\padelvision\.env.production - w GitHubie nie ma zadnych sekretow.
+#
+# Instrukcja: docs/DEPLOY.md
 
 on:
   workflow_call:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Etykieta nadawana przy instalacji runnera - tylko ten job trafia na serwer
+    runs-on: [self-hosted, windows, padelvision-prod]
     environment: production
     permissions:
       contents: read
-      # pobranie prywatnych obrazów z GHCR na droplecie
-      packages: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check deploy secrets
-        env:
-          DO_HOST: ${{ secrets.DIGITALOCEAN_HOST }}
-          DO_KEY: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
-        run: |
-          missing=0
-          [ -z "$DO_HOST" ]        && echo "::error::Brak sekretu DIGITALOCEAN_HOST"    && missing=1
-          [ -z "$DO_KEY" ]         && echo "::error::Brak sekretu DIGITALOCEAN_SSH_KEY" && missing=1
-          [ -z "$ENV_PRODUCTION" ] && echo "::error::Brak sekretu ENV_PRODUCTION"       && missing=1
-          if [ "$missing" -eq 1 ]; then
-            echo "Instrukcja konfiguracji: docs/DEPLOY.md"
-            exit 1
-          fi
-
-      # Sekret przekazany przez env, nie wklejany w skrypt — bez ryzyka
-      # wstrzyknięcia i z automatycznym maskowaniem w logach
-      - name: Write .env.production
-        env:
-          ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
-        run: |
-          umask 077
-          printf '%s\n' "$ENV_PRODUCTION" > .env.production
-          if ! grep -q '^POSTGRES_PASSWORD=.\+' .env.production; then
-            echo "::error::ENV_PRODUCTION nie zawiera POSTGRES_PASSWORD — bez niego baza nie wystartuje"
-            exit 1
-          fi
-
-      - name: Copy files to server
-        uses: appleboy/scp-action@v0.1.7
+      - uses: actions/download-artifact@v4
         with:
-          host: ${{ secrets.DIGITALOCEAN_HOST }}
-          username: ${{ secrets.DIGITALOCEAN_USERNAME || 'root' }}
-          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          source: "docker-compose.prod.yml,.env.production,deploy/Caddyfile"
-          target: /opt/padelvision/
+          name: backend-jar
+          path: artifact
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          DEPLOY_SHA: ${{ github.sha }}
-          # Token ważny tylko w trakcie tego joba — wystarczy do pobrania obrazów
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
-        with:
-          host: ${{ secrets.DIGITALOCEAN_HOST }}
-          username: ${{ secrets.DIGITALOCEAN_USERNAME || 'root' }}
-          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          envs: DEPLOY_SHA,GHCR_TOKEN,GHCR_USER
-          script: |
-            set -e
-            cd /opt/padelvision
-            chmod 600 .env.production
-            mkdir -p /mnt/storage/postgres /mnt/storage/redis
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker compose -f docker-compose.prod.yml --env-file .env.production pull
-            docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
-            docker logout ghcr.io
-            echo "Czekam na start usług..."
-            sleep 20
-            docker compose -f docker-compose.prod.yml --env-file .env.production ps
-            docker image prune -f
-            echo "Deploy complete: $DEPLOY_SHA"
+      # -ExecutionPolicy Bypass: firmowe GPO moga blokowac niepodpisane skrypty
+      - name: Deploy
+        shell: powershell
+        run: |
+          $jar = Get-ChildItem artifact -Filter *.jar | Select-Object -First 1
+          if (-not $jar) { throw 'Brak pliku JAR w artefakcie backend-jar' }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\windows\deploy.ps1 -JarPath $jar.FullName
+          exit $LASTEXITCODE
